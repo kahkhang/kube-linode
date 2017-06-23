@@ -1,5 +1,6 @@
 #!/bin/sh
-mkdir ~/.kube-linode
+set -e
+mkdir -p ~/.kube-linode
 [ -e ~/.kube-linode/install-coreos.sh ] && rm ~/.kube-linode/install-coreos.sh
 [ -e ~/.kube-linode/kube-linode.sh ] && rm ~/.kube-linode/kube-linode.sh
 [ -e ~/.kube-linode/utilities.sh ] && rm ~/.kube-linode/utilities.sh
