@@ -42,7 +42,7 @@ if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     echo_completed "Generating new SSH key"
 fi
 
-if [ -f auth ]  ; then : ; else
+if [ -f ~/.kube-linode/auth ]  ; then : ; else
     echo "Key in your dashboard password (Required for https://kube.$DOMAIN, https://traefik.$DOMAIN)"
     htpasswd -c ~/.kube-linode/auth $USERNAME
 fi
