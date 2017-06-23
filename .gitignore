@@ -1,0 +1,8 @@
+certs/
+acme.json
+auth
+settings.env
+testing.sh
+package.sh
+*.yaml
+*.zip
