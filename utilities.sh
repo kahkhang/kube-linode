@@ -359,10 +359,10 @@ EOF
     echo_completed "Starting to provision $NODE_TYPE node" $LINODE_ID
 
     if [ "$NODE_TYPE" = "master" ] ; then
-        if [ -e acme.json ] ; then
+        if [ -e ~/.kube-linode/acme.json ] ; then
             echo_pending "Transferring acme.json" $LINODE_ID
             ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$PUBLIC_IP" \
-            "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 < acme.json )' \
+            "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 < ~/.kube-linode/acme.json )' \
              | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
             echo_completed "Transferred acme.json" $LINODE_ID
         fi
