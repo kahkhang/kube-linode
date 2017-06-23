@@ -39,4 +39,3 @@ Settings are stored in `settings.env`. If the script has been run at least once,
 ### Acknowledgements
 This source code was based on APIC-NET's [k8s-cluster](https://github.com/APNIC-net/linode-k8s-cluster), using a
 modified version of [CoreOS](https://coreos.com/kubernetes/docs/latest/getting-started.html)'s manual installation instructions and [Linode's API](https://www.linode.com/api).
-[homebrew]: https://brew.sh/
