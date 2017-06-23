@@ -403,14 +403,14 @@ read_api_key() {
          printf "Enter Linode API Key (https://manager.linode.com/profile/api) : "
          read API_KEY
       done
-      echo "API_KEY=$API_KEY" >> settings.env
+      echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
   else
       if ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; then
         while ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; do
            printf "Enter Linode API Key (https://manager.linode.com/profile/api) : "
            read API_KEY
         done
-        echo "API_KEY=$API_KEY" >> settings.env
+        echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
       fi
   fi
 }
@@ -422,7 +422,7 @@ read_master_plan() {
          printf "Enter PlanID for master node: "
          read MASTER_PLAN
       done
-      echo "MASTER_PLAN=$MASTER_PLAN" >> settings.env
+      echo "MASTER_PLAN=$MASTER_PLAN" >> ~/.kube-linode/settings.env
   fi
 
 }
@@ -434,7 +434,7 @@ read_worker_plan() {
          printf "Enter PlanID for worker node: "
          read WORKER_PLAN
       done
-      echo "WORKER_PLAN=$WORKER_PLAN" >> settings.env
+      echo "WORKER_PLAN=$WORKER_PLAN" >> ~/.kube-linode/settings.env
   fi
 
 }
@@ -451,7 +451,7 @@ read_datacenter() {
          printf "Enter ID for Data Center: "
          read DATACENTER_ID
       done
-      echo "DATACENTER_ID=$DATACENTER_ID" >> settings.env
+      echo "DATACENTER_ID=$DATACENTER_ID" >> ~/.kube-linode/settings.env
   fi
 }
 
@@ -461,7 +461,7 @@ read_domain() {
          printf "Enter Domain Name: "
          read DOMAIN
       done
-      echo "DOMAIN=$DOMAIN" >> settings.env
+      echo "DOMAIN=$DOMAIN" >> ~/.kube-linode/settings.env
   fi
 }
 
@@ -472,7 +472,7 @@ read_email() {
          printf "Enter Email: "
          read EMAIL
       done
-      echo "EMAIL=$EMAIL" >> settings.env
+      echo "EMAIL=$EMAIL" >> ~/.kube-linode/settings.env
   fi
 }
 
@@ -526,6 +526,6 @@ read_no_of_workers() {
          printf "Enter number of workers: "
          read NO_OF_WORKERS
       done
-      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> settings.env
+      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> ~/.kube-linode/settings.env
   fi
 }
