@@ -13,4 +13,5 @@ chmod +x ~/.kube-linode/install-coreos.sh
 chmod +x ~/.kube-linode/kube-linode.sh
 chmod +x ~/.kube-linode/utilities.sh
 
-[ ! -e /usr/local/bin/kube-linode ] && ln -s ~/.kube-linode/kube-linode.sh /usr/local/bin/kube-linode && hash -r
+[ ! -e /usr/local/bin/kube-linode ] && ln -s ~/.kube-linode/kube-linode.sh /usr/local/bin/kube-linode
+hash kube-linode
