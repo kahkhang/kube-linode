@@ -1,4 +1,4 @@
-## Scalable Kubernetes / CoreOS Cluster on Linode
+## Provision a Kubernetes / CoreOS Cluster on Linode
 
 Automatically provisions a scalable CoreOS/Kubernetes cluster on Linode, comprising of a single schedulable Kubernetes master host with a custom number of worker nodes.
 
