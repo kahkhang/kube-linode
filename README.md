@@ -21,17 +21,15 @@ This shell script uses the following programs: `jq`, `openssl`, `curl`, `htpassw
 You should also have a Linode Account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
 
 To install using OSX's [homebrew](https://brew.sh/):
-```
+```sh
 brew install jq openssl curl kubectl
 ```
 
 ### Usage
 
 To download the script and run it:
-```
-git clone https://github.com/kahkhang/kube-linode.git
-cd kube-linode && chmod +x ./kube-linode.sh
-./kube-linode.sh
+```sh
+(curl https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh) | sh
 ```
 
 Settings are stored in `settings.env`. If the script has been run at least once, to increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `./kube-linode.sh` again.
