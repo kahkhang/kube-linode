@@ -29,7 +29,7 @@ brew install jq openssl curl kubectl
 
 To download the script and run it:
 ```sh
-(curl https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh) | sh
+(curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh) && kube-linode
 ```
 
 Settings are stored in `settings.env`. If the script has been run at least once, to increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `./kube-linode.sh` again.

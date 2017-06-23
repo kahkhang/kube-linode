@@ -150,9 +150,9 @@ gen_master_certs() {
   MASTER_IP=$1
   LINODE_ID=$2
   echo_pending "Generating master certificates" $LINODE_ID
-  mkdir -p certs >/dev/null
-  [ -e certs/openssl.cnf ] && rm certs/openssl.cnf >/dev/null
-  cat > certs/openssl.cnf <<-EOF
+  mkdir -p ~/.kube-linode/certs >/dev/null
+  [ -e ~/.kube-linode/certs/openssl.cnf ] && rm ~/.kube-linode/certs/openssl.cnf >/dev/null
+  cat > ~/.kube-linode/certs/openssl.cnf <<-EOF
     [req]
     req_extensions = v3_req
     distinguished_name = req_distinguished_name
@@ -169,14 +169,14 @@ gen_master_certs() {
     IP.1 = 10.3.0.1
     IP.2 = $MASTER_IP
 EOF
-  openssl genrsa -out certs/ca-key.pem 2048 >/dev/null 2>&1
-  openssl req -x509 -new -nodes -key certs/ca-key.pem -days 10000 -out certs/ca.pem -subj "/CN=kube-ca" >/dev/null 2>&1
-  openssl genrsa -out certs/apiserver-key.pem 2048 >/dev/null 2>&1
-  openssl req -new -key certs/apiserver-key.pem -out certs/apiserver.csr -subj "/CN=kube-apiserver" -config certs/openssl.cnf >/dev/null 2>&1
-  openssl x509 -req -in certs/apiserver.csr -CA certs/ca.pem -CAkey certs/ca-key.pem -CAcreateserial -out certs/apiserver.pem -days 365 -extensions v3_req -extfile certs/openssl.cnf >/dev/null 2>&1
-  openssl genrsa -out certs/admin-key.pem 2048 >/dev/null 2>&1
-  openssl req -new -key certs/admin-key.pem -out certs/admin.csr -subj "/CN=kube-admin" >/dev/null 2>&1
-  openssl x509 -req -in certs/admin.csr -CA certs/ca.pem -CAkey certs/ca-key.pem -CAcreateserial -out certs/admin.pem -days 365 >/dev/null 2>&1
+  openssl genrsa -out ~/.kube-linode/certs/ca-key.pem 2048 >/dev/null 2>&1
+  openssl req -x509 -new -nodes -key ~/.kube-linode/certs/ca-key.pem -days 10000 -out ~/.kube-linode/certs/ca.pem -subj "/CN=kube-ca" >/dev/null 2>&1
+  openssl genrsa -out ~/.kube-linode/certs/apiserver-key.pem 2048 >/dev/null 2>&1
+  openssl req -new -key ~/.kube-linode/certs/apiserver-key.pem -out ~/.kube-linode/certs/apiserver.csr -subj "/CN=kube-apiserver" -config ~/.kube-linode/certs/openssl.cnf >/dev/null 2>&1
+  openssl x509 -req -in ~/.kube-linode/certs/apiserver.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/apiserver.pem -days 365 -extensions v3_req -extfile ~/.kube-linode/certs/openssl.cnf >/dev/null 2>&1
+  openssl genrsa -out ~/.kube-linode/certs/admin-key.pem 2048 >/dev/null 2>&1
+  openssl req -new -key ~/.kube-linode/certs/admin-key.pem -out ~/.kube-linode/certs/admin.csr -subj "/CN=kube-admin" >/dev/null 2>&1
+  openssl x509 -req -in ~/.kube-linode/certs/admin.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/admin.pem -days 365 >/dev/null 2>&1
   echo_completed "Generated master certificates" $LINODE_ID
 }
 
@@ -185,8 +185,8 @@ gen_worker_certs() {
   WORKER_IP=$1
   LINODE_ID=$2
   echo_pending "Generating worker certificates" $LINODE_ID
-  if [ -f certs/worker-openssl.cnf ] ; then : ; else
-      cat > certs/worker-openssl.cnf <<-EOF
+  if [ -f ~/.kube-linode/certs/worker-openssl.cnf ] ; then : ; else
+      cat > ~/.kube-linode/certs/worker-openssl.cnf <<-EOF
         [req]
         req_extensions = v3_req
         distinguished_name = req_distinguished_name
@@ -200,9 +200,9 @@ gen_worker_certs() {
 EOF
   fi
 
-  openssl genrsa -out certs/${WORKER_FQDN}-worker-key.pem 2048 >/dev/null 2>&1
-  WORKER_IP=${WORKER_IP} openssl req -new -key certs/${WORKER_FQDN}-worker-key.pem -out certs/${WORKER_FQDN}-worker.csr -subj "/CN=${WORKER_FQDN}" -config certs/worker-openssl.cnf >/dev/null 2>&1
-  WORKER_IP=${WORKER_IP} openssl x509 -req -in certs/${WORKER_FQDN}-worker.csr -CA certs/ca.pem -CAkey certs/ca-key.pem -CAcreateserial -out certs/${WORKER_FQDN}-worker.pem -days 365 -extensions v3_req -extfile certs/worker-openssl.cnf >/dev/null 2>&1
+  openssl genrsa -out ~/.kube-linode/certs/${WORKER_FQDN}-worker-key.pem 2048 >/dev/null 2>&1
+  WORKER_IP=${WORKER_IP} openssl req -new -key ~/.kube-linode/certs/${WORKER_FQDN}-worker-key.pem -out ~/.kube-linode/certs/${WORKER_FQDN}-worker.csr -subj "/CN=${WORKER_FQDN}" -config ~/.kube-linode/certs/worker-openssl.cnf >/dev/null 2>&1
+  WORKER_IP=${WORKER_IP} openssl x509 -req -in ~/.kube-linode/certs/${WORKER_FQDN}-worker.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/${WORKER_FQDN}-worker.pem -days 365 -extensions v3_req -extfile ~/.kube-linode/certs/worker-openssl.cnf >/dev/null 2>&1
   echo_pending "Generated worker certificates" $LINODE_ID
 }
 
@@ -253,12 +253,12 @@ install() {
         echo_pending "Initializing stackscript parameters" $LINODE_ID
         PARAMS=$( cat <<-EOF
           {
-              "admin_key_cert": "$( base64 < certs/admin-key.pem )",
-              "admin_cert": "$( base64 < certs/admin.pem )",
-              "apiserver_key_cert": "$( base64 < certs/apiserver-key.pem )",
-              "apiserver_cert": "$( base64 < certs/apiserver.pem )",
-              "ca_key_cert": "$( base64 < certs/ca-key.pem )",
-              "ca_cert": "$( base64 < certs/ca.pem )",
+              "admin_key_cert": "$( base64 < ~/.kube-linode/certs/admin-key.pem )",
+              "admin_cert": "$( base64 < ~/.kube-linode/certs/admin.pem )",
+              "apiserver_key_cert": "$( base64 < ~/.kube-linode/certs/apiserver-key.pem )",
+              "apiserver_cert": "$( base64 < ~/.kube-linode/certs/apiserver.pem )",
+              "ca_key_cert": "$( base64 < ~/.kube-linode/certs/ca-key.pem )",
+              "ca_cert": "$( base64 < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "public_ip": "$PUBLIC_IP",
               "node_type": "$NODE_TYPE",
@@ -286,9 +286,9 @@ EOF
         echo_pending "Initializing stackscript parameters" $LINODE_ID
         PARAMS=$( cat <<-EOF
           {
-              "worker_key_cert": "$( base64 < certs/${PUBLIC_IP}-worker-key.pem )",
-              "worker_cert": "$( base64 < certs/${PUBLIC_IP}-worker.pem )",
-              "ca_cert": "$( base64 < certs/ca.pem )",
+              "worker_key_cert": "$( base64 < ~/.kube-linode/certs/${PUBLIC_IP}-worker-key.pem )",
+              "worker_cert": "$( base64 < ~/.kube-linode/certs/${PUBLIC_IP}-worker.pem )",
+              "ca_cert": "$( base64 < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "public_ip": "$PUBLIC_IP",
               "node_type": "$NODE_TYPE",
@@ -303,7 +303,7 @@ EOF
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 < auth )",
+              "AUTH" : "$( base64 < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -385,10 +385,10 @@ update_script() {
   echo_pending "Updating install script"
   SCRIPT_ID=$( linode_api stackscript.list | jq ".DATA" | jq -c '.[] | select(.LABEL == "CoreOS_Kube_Cluster") | .STACKSCRIPTID' | sed -n 1p )
   if ! [[ $SCRIPT_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
-      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat install-coreos.sh )" \
+      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat ~/.kube-linode/install-coreos.sh )" \
                   | jq ".DATA.StackScriptID" )
   else
-      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat install-coreos.sh )" >/dev/null
+      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat ~/.kube-linode/install-coreos.sh )" >/dev/null
   fi
   echo_completed "Updated install script"
 }

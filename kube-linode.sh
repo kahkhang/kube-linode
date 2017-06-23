@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-source utilities.sh
+source ~/.kube-linode/utilities.sh
 
 check_dep jq
 check_dep openssl
@@ -19,10 +19,10 @@ unset EMAIL
 unset MASTER_ID
 unset API_KEY
 
-if [ -f settings.env ] ; then
-    . settings.env
+if [ -f ~/.kube-linode/settings.env ] ; then
+    . ~/.kube-linode/settings.env
 else
-    touch settings.env
+    touch ~/.kube-linode/settings.env
 fi
 
 read_api_key
@@ -44,7 +44,7 @@ fi
 
 if [ -f auth ]  ; then : ; else
     echo "Key in your dashboard password (Required for https://kube.$DOMAIN, https://traefik.$DOMAIN)"
-    htpasswd -c ./auth $USERNAME
+    htpasswd -c ~/.kube-linode/auth $USERNAME
 fi
 
 update_script
@@ -72,9 +72,9 @@ if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
    linode_api linode.update LinodeID=$MASTER_ID Label="master_${MASTER_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)" >/dev/null
    echo_pending "Initialized labels" $MASTER_ID
 
-   if [ -d certs ]; then
+   if [ -d ~/.kube-linode/certs ]; then
      echo_pending "Removing existing certificates" $MASTER_ID
-     rm -rf certs;
+     rm -rf ~/.kube-linode/certs;
      echo_completed "Removed existing certificates" $MASTER_ID
    fi
 fi
@@ -89,8 +89,8 @@ if [ "$( is_provisioned $MASTER_ID )" = false ] ; then
   install master $MASTER_ID
 
   echo_pending "Setting defaults for kubectl"
-  kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=certs/ca.pem >/dev/null
-  kubectl config set-credentials ${USERNAME} --certificate-authority=certs/ca.pem --client-key=certs/admin-key.pem --client-certificate=certs/admin.pem >/dev/null
+  kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=~/.kube-linode/certs/ca.pem >/dev/null
+  kubectl config set-credentials ${USERNAME} --certificate-authority=~/.kube-linode/certs/ca.pem --client-key=~/.kube-linode/certs/admin-key.pem --client-certificate=~/.kube-linode/certs/admin.pem >/dev/null
   kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
   kubectl config use-context default-context >/dev/null
   echo_completed "Set defaults for kubectl"
