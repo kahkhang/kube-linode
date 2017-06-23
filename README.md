@@ -29,7 +29,7 @@ brew install jq openssl curl kubectl
 
 To install the script:
 ```sh
-curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh | sh
+curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh | bash
 ```
 
 Just type `kube-linode` into your console, and have a :coffee:!
