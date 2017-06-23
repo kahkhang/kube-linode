@@ -273,7 +273,7 @@ install() {
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 < auth )",
+              "AUTH" : "$( base64 < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
