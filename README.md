@@ -32,12 +32,12 @@ To install the script:
 curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh | sh
 ```
 
-To run `kube-linode`:
+Just type `kube-linode` into your console, and have a :coffee:!
 ```sh
 kube-linode
 ```
 
-Settings are stored in `settings.env`. If the script has been run at least once, to increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `./kube-linode.sh` again.
+Settings are stored in `~/.kube-linode/settings.env`. If the script has been run at least once, to increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `./kube-linode.sh` again.
 
 ### Acknowledgements
 This source code was based on APIC-NET's [k8s-cluster](https://github.com/APNIC-net/linode-k8s-cluster), using a
