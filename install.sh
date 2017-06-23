@@ -20,6 +20,6 @@ chmod +x ~/.kube-linode/utilities.sh
 [ ! -e /usr/local/bin/kube-linode ] && ln -s ~/.kube-linode/kube-linode.sh /usr/local/bin/kube-linode
 hash kube-linode
 
-echo -ne '######################   (100%)\r'
+echo -ne '######################   (100%)\n'
 echo 'kube-linode installed! 🎉             '
 echo "Run \`kube-linode\` to provision a cluster"
