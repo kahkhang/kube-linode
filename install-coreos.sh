@@ -138,34 +138,133 @@ $( echo $CA_CERT | base64 --decode | sed 's/^/      /' )
       GREEN=\$(tput setaf 2)
       CYAN=\$(tput setaf 6)
       NORMAL=\$(tput sgr0)
+      BOLD=\$(tput bold)
       YELLOW=\$(tput setaf 3)
 
+      _spinner() {
+          local on_success=" Completed "
+          local on_fail="  Failed   "
+          local green
+          local red
+          green="\$(tput setaf 2)"
+          red="\$(tput setaf 5)"
+          nc="\$(tput sgr0)"
+          case \$1 in
+              start)
+                  let column=\$(tput cols)-\${#2}+10
+                  echo -ne \${2}
+                  printf "%\${column}s"
+                  i=0
+                  sp=( "[\$(echo -e '\xE2\x97\x8F')          ]"
+                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
+                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
+                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
+                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
+                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
+                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
+                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
+                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
+                       "[         \$(echo -e '\xE2\x97\x8F') ]"
+                       "[          \$(echo -e '\xE2\x97\x8F')]"
+                       "[         \$(echo -e '\xE2\x97\x8F') ]"
+                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
+                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
+                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
+                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
+                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
+                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
+                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
+                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
+                       "[\$(echo -e '\xE2\x97\x8F')          ]")
+                  delay=0.04
+
+                  while :
+                  do
+                      printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\${sp[i]}"
+                      i=\$((i+1))
+                      i=\$((i%20))
+                      sleep \$delay
+                  done
+                  ;;
+              stop)
+                  if [[ -z \${3} ]]; then
+                      echo "spinner is not running.."
+                      exit 1
+                  fi
+
+                  kill \$3 > /dev/null 2>&1
+                  echo -ne "\r"
+                  echo -ne "\${4}"
+                  let column=\$(tput cols)-\${#4}+10
+                  printf "%\${column}s"
+                  # inform the user uppon success or failure
+                  echo -en "\b\b\b\b\b\b\b\b\b\b\b\b\b["
+                  if [[ \$2 -eq 0 ]]; then
+                      echo -en "\${green}\${on_success}\${nc}"
+                  else
+                      echo -en "\${red}\${on_fail}\${nc}"
+                  fi
+                  echo -e "]"
+                  ;;
+              update)
+                  if [[ -z \${3} ]]; then
+                      echo "spinner is not running.."
+                      exit 1
+                  fi
+                  kill \$3 > /dev/null 2>&1
+                  echo -ne "\r"
+                  ;;
+              *)
+                  echo "invalid argument, try {start/stop}"
+                  exit 1
+                  ;;
+          esac
+      }
+
+      start_spinner() {
+          _spinner "start" "\${1}" &
+          _sp_pid=\$!
+          disown
+      }
+
+      stop_spinner() {
+          _spinner "stop" 0 \$_sp_pid "\$1"
+          unset _sp_pid
+      }
+
+      update_spinner() {
+          _spinner "update" 0 \$_sp_pid
+          unset _sp_pid
+          start_spinner "\${1}"
+      }
+
       echo_pending() {
-        local PADDING
-        local STR_WITH_PADDING
-        PADDING=\$(printf '%0.1s' "."{1..94})
-        STR_WITH_PADDING="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        printf "%s%s[%s]\n" "\$STR_WITH_PADDING" "\${PADDING:\${#STR_WITH_PADDING}}" "\${YELLOW}  Pending  \${NORMAL}"
+        local str
+        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
+        start_spinner "\$str"
+      }
+
+      echo_update() {
+        local str
+        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
+        update_spinner "\$str"
       }
 
       echo_completed() {
-        local PADDING
-        local STR_WITH_PADDING
-        PADDING=\$(printf '%0.1s' "."{1..94})
-        STR_WITH_PADDING="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        printf "%s%s[%s]\n" "\$STR_WITH_PADDING" "\${PADDING:\${#STR_WITH_PADDING}}" "\${GREEN} Completed \${NORMAL}"
+        local str
+        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
+        stop_spinner "\$str"
       }
 
       sudo systemctl daemon-reload
       echo_pending "Starting flannel (might take a while)"
       while ! sudo systemctl start flanneld >/dev/null 2>&1; do sleep 5 ; done
       sudo systemctl enable flanneld >/dev/null 2>&1
-      echo_completed "Started flannel"
 
-      echo_pending "Starting kubelet"
+      echo_update "Starting kubelet"
       sudo systemctl start kubelet >/dev/null
       sudo systemctl enable kubelet >/dev/null 2>&1
-      echo_completed "Started kubelet"
+      echo_completed "Provisioned worker node"
       exit 0
 EOF
 
@@ -739,7 +838,7 @@ $( echo $CA_CERT | base64 --decode | sed 's/^/      /' )
           entryPoint = "https"
           onDemand = true
           onHostRule = true
-          caServer = "https://acme-v01.api.letsencrypt.org/directory"
+          caServer = "https://acme-staging.api.letsencrypt.org/directory"
           [[acme.domains]]
           main = "${DOMAIN}"
       ---
@@ -877,22 +976,122 @@ $( echo $AUTH | base64 --decode | sed 's/^/      /' )
       GREEN=\$(tput setaf 2)
       CYAN=\$(tput setaf 6)
       NORMAL=\$(tput sgr0)
+      BOLD=\$(tput bold)
       YELLOW=\$(tput setaf 3)
 
+      _spinner() {
+          local on_success=" Completed "
+          local on_fail="  Failed   "
+          local green
+          local red
+          green="\$(tput setaf 2)"
+          red="\$(tput setaf 5)"
+          nc="\$(tput sgr0)"
+          case \$1 in
+              start)
+                  let column=\$(tput cols)-\${#2}+10
+                  echo -ne \${2}
+                  printf "%\${column}s"
+                  i=0
+                  sp=( "[\$(echo -e '\xE2\x97\x8F')          ]"
+                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
+                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
+                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
+                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
+                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
+                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
+                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
+                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
+                       "[         \$(echo -e '\xE2\x97\x8F') ]"
+                       "[          \$(echo -e '\xE2\x97\x8F')]"
+                       "[         \$(echo -e '\xE2\x97\x8F') ]"
+                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
+                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
+                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
+                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
+                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
+                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
+                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
+                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
+                       "[\$(echo -e '\xE2\x97\x8F')          ]")
+                  delay=0.04
+
+                  while :
+                  do
+                      printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\${sp[i]}"
+                      i=\$((i+1))
+                      i=\$((i%20))
+                      sleep \$delay
+                  done
+                  ;;
+              stop)
+                  if [[ -z \${3} ]]; then
+                      echo "spinner is not running.."
+                      exit 1
+                  fi
+
+                  kill \$3 > /dev/null 2>&1
+                  echo -ne "\r"
+                  echo -ne "\${4}"
+                  let column=\$(tput cols)-\${#4}+10
+                  printf "%\${column}s"
+                  # inform the user uppon success or failure
+                  echo -en "\b\b\b\b\b\b\b\b\b\b\b\b\b["
+                  if [[ \$2 -eq 0 ]]; then
+                      echo -en "\${green}\${on_success}\${nc}"
+                  else
+                      echo -en "\${red}\${on_fail}\${nc}"
+                  fi
+                  echo -e "]"
+                  ;;
+              update)
+                  if [[ -z \${3} ]]; then
+                      echo "spinner is not running.."
+                      exit 1
+                  fi
+                  kill \$3 > /dev/null 2>&1
+                  echo -ne "\r"
+                  ;;
+              *)
+                  echo "invalid argument, try {start/stop}"
+                  exit 1
+                  ;;
+          esac
+      }
+
+      start_spinner() {
+          _spinner "start" "\${1}" &
+          _sp_pid=\$!
+          disown
+      }
+
+      stop_spinner() {
+          _spinner "stop" 0 \$_sp_pid "\$1"
+          unset _sp_pid
+      }
+
+      update_spinner() {
+          _spinner "update" 0 \$_sp_pid
+          unset _sp_pid
+          start_spinner "\${1}"
+      }
+
       echo_pending() {
-        local PADDING
-        local STR_WITH_PADDING
-        PADDING=\$(printf '%0.1s' "."{1..94})
-        STR_WITH_PADDING="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        printf "%s%s[%s]\n" "\$STR_WITH_PADDING" "\${PADDING:\${#STR_WITH_PADDING}}" "\${YELLOW}  Pending  \${NORMAL}"
+        local str
+        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
+        start_spinner "\$str"
+      }
+
+      echo_update() {
+        local str
+        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
+        update_spinner "\$str"
       }
 
       echo_completed() {
-        local PADDING
-        local STR_WITH_PADDING
-        PADDING=\$(printf '%0.1s' "."{1..94})
-        STR_WITH_PADDING="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        printf "%s%s[%s]\n" "\$STR_WITH_PADDING" "\${PADDING:\${#STR_WITH_PADDING}}" "\${GREEN} Completed \${NORMAL}"
+        local str
+        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
+        stop_spinner "\$str"
       }
 
       echo_pending "Installing kubectl"
@@ -901,71 +1100,59 @@ $( echo $AUTH | base64 --decode | sed 's/^/      /' )
       sudo mkdir -p /opt/bin
       sudo mv kubectl /opt/bin/kubectl
       export PATH=\$PATH:/opt/bin
-      echo_completed "Installed kubectl"
 
-      echo_pending "Starting etcd"
+      echo_update "Starting etcd"
       sudo systemctl start etcd2 >/dev/null
       sudo systemctl enable etcd2 >/dev/null 2>&1
       sudo systemctl daemon-reload >/dev/null
       while ! curl -s -X PUT -d "value={\"Network\":\"10.2.0.0/16\",\"Backend\":{\"Type\":\"vxlan\"}}" "${ETCD_ENDPOINT}/v2/keys/coreos.com/network/config" >/dev/null ; do sleep 5 ; done
-      echo_completed "Started etcd"
 
-      echo_pending "Starting flannel (might take a while)"
+      echo_update "Starting flannel (might take a while)"
       while ! sudo systemctl start flanneld >/dev/null 2>&1; do sleep 5 ; done
       sudo systemctl enable flanneld >/dev/null 2>&1
-      echo_completed "Started flannel"
 
-      echo_pending "Setting defaults for kubectl"
+      echo_update "Setting defaults for kubectl"
       kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=/etc/kubernetes/ssl/ca.pem >/dev/null
       kubectl config set-credentials ${USERNAME} --certificate-authority=/etc/kubernetes/ssl/ca.pem --client-key=/etc/kubernetes/ssl/admin-key.pem --client-certificate=/etc/kubernetes/ssl/admin.pem >/dev/null
       kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
       kubectl config use-context default-context >/dev/null
-      echo_completed "Set defaults for kubectl"
 
-      echo_pending "Starting kubelet (might take a while)"
+      echo_update "Starting kubelet (might take a while)"
       sudo systemctl start kubelet >/dev/null
       sudo systemctl enable kubelet >/dev/null 2>&1
       while ! curl -s http://127.0.0.1:8080/version >/dev/null 2>&1; do sleep 5 ; done
       sleep 10
-      echo_completed "Started kubelet"
 
-      echo_pending "Installing kube-dns"
+      echo_update "Installing kube-dns"
       kubectl create -f kube-dns.yaml >/dev/null 2>&1
       while ! kubectl get pods --namespace=kube-system | grep kube-dns | grep Running >/dev/null 2>&1; do sleep 5 ; done
       sleep 10
-      echo_completed "Started kube-dns"
 
-      echo_pending "Creating kube-secret"
+      echo_update "Creating kube-secret"
       kubectl --namespace=kube-system create secret generic kubesecret --from-file /home/${USERNAME}/auth >/dev/null
-      echo_completed "Created kube-secret"
 
-      echo_pending "Installing traefik"
+      echo_update "Installing traefik"
       kubectl create -f /home/${USERNAME}/traefik.yaml >/dev/null 2>&1
       while ! kubectl get pods --namespace=kube-system | grep traefik | grep Running >/dev/null 2>&1; do sleep 5 ; done
       sleep 10
-      echo_completed "Installed traefik"
 
-      echo_pending "Installing heapster"
+      echo_update "Installing heapster"
       kubectl create -f heapster.yaml >/dev/null 2>&1
       while ! kubectl get pods --namespace=kube-system | grep heapster | grep Running >/dev/null 2>&1; do sleep 5 ; done
-      echo_completed "Installed heapster"
 
-      echo_pending "Installing kube-dashboard"
+      echo_update "Installing kube-dashboard"
       kubectl create -f kube-dashboard.yaml >/dev/null 2>&1
       while ! kubectl get pods --namespace=kube-system | grep dashboard | grep Running >/dev/null 2>&1; do sleep 5 ; done
-      echo_completed "Installed kube-dashboard"
 
-      echo_pending "Installing local storage class"
+      echo_update "Installing local storage class"
       kubectl create -f local-storage-class.yaml >/dev/null 2>&1
-      echo_completed "Installed local storage class"
 
-      echo_pending "Creating local storage admin"
+      echo_update "Creating local storage admin"
       kubectl create -f local-storage-admin.yaml >/dev/null 2>&1
-      echo_completed "Created local storage admin"
 
-      echo_pending "Installing local storage provisioner"
+      echo_update "Installing local storage provisioner"
       kubectl create -f local-storage-provisioner.yaml >/dev/null 2>&1
-      echo_completed "Installed local storage provisioner"
+      echo_completed "Provisioning master node"
 
       exit 0
 EOF

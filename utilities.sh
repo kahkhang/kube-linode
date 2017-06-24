@@ -1,16 +1,141 @@
 #!/bin/bash
-# BSD 3-Clause License
-# Modifications by Andrew Low, Copyright (C) 2017
-# Copyright (c) 2016, APNIC Pty Ltd
-# All rights reserved.
 
-source ~/.kube-linode/spinner.sh
+control_c() {
+  echo_completed "Exiting"
+  tput cnorm
+  stty echo
+  exit $?
+}
 
-GREEN=$(tput setaf 2)
+trap control_c SIGINT
+
+_spinner() {
+    local on_success=" Completed "
+    local on_fail="  Failed   "
+    local green
+    local red
+    green="$(tput setaf 2)"
+    red="$(tput setaf 5)"
+    nc="$(tput sgr0)"
+    case $1 in
+        start)
+            let column=$(tput cols)-${#2}+10
+            echo -ne ${2}
+            printf "%${column}s"
+            i=0
+            sp=( "[$(echo -e '\xE2\x97\x8F')          ]"
+                 "[ $(echo -e '\xE2\x97\x8F')         ]"
+                 "[  $(echo -e '\xE2\x97\x8F')        ]"
+                 "[   $(echo -e '\xE2\x97\x8F')       ]"
+                 "[    $(echo -e '\xE2\x97\x8F')      ]"
+                 "[     $(echo -e '\xE2\x97\x8F')     ]"
+                 "[      $(echo -e '\xE2\x97\x8F')    ]"
+                 "[       $(echo -e '\xE2\x97\x8F')   ]"
+                 "[        $(echo -e '\xE2\x97\x8F')  ]"
+                 "[         $(echo -e '\xE2\x97\x8F') ]"
+                 "[          $(echo -e '\xE2\x97\x8F')]"
+                 "[         $(echo -e '\xE2\x97\x8F') ]"
+                 "[        $(echo -e '\xE2\x97\x8F')  ]"
+                 "[       $(echo -e '\xE2\x97\x8F')   ]"
+                 "[      $(echo -e '\xE2\x97\x8F')    ]"
+                 "[     $(echo -e '\xE2\x97\x8F')     ]"
+                 "[    $(echo -e '\xE2\x97\x8F')      ]"
+                 "[   $(echo -e '\xE2\x97\x8F')       ]"
+                 "[  $(echo -e '\xE2\x97\x8F')        ]"
+                 "[ $(echo -e '\xE2\x97\x8F')         ]"
+                 "[$(echo -e '\xE2\x97\x8F')          ]")
+            delay=0.04
+            trap control_c EXIT SIGINT
+            while :
+            do
+                printf "\b\b\b\b\b\b\b\b\b\b\b\b\b${sp[i]}"
+                i=$((i+1))
+                i=$((i%20))
+                sleep $delay
+            done
+            ;;
+        stop)
+            if [[ -z ${3} ]]; then
+                echo "spinner is not running.."
+                exit 1
+            fi
+
+            kill $3 > /dev/null 2>&1
+            echo -ne "\r"
+            echo -ne "${4}"
+            let column=$(tput cols)-${#4}+10
+            printf "%${column}s"
+            # inform the user uppon success or failure
+            echo -en "\b\b\b\b\b\b\b\b\b\b\b\b\b["
+            if [[ $2 -eq 0 ]]; then
+                echo -en "${green}${on_success}${nc}"
+            else
+                echo -en "${red}${on_fail}${nc}"
+            fi
+            echo -e "]"
+            ;;
+        update)
+            if [[ -z ${3} ]]; then
+                echo "spinner is not running.."
+                exit 1
+            fi
+            kill $3 > /dev/null 2>&1
+            echo -ne "\r"
+            ;;
+        *)
+            echo "invalid argument, try {start/stop}"
+            exit 1
+            ;;
+    esac
+}
+
+start_spinner() {
+    _spinner "start" "${1}" &
+    _sp_pid=$!
+    disown
+}
+
+stop_spinner() {
+    _spinner "stop" 0 $_sp_pid "$1"
+    unset _sp_pid
+}
+
+update_spinner() {
+    _spinner "update" 0 $_sp_pid
+    unset _sp_pid
+    start_spinner "${1}"
+}
+
+echo_pending() {
+  local str
+  str="${CYAN}${NORMAL}$1"
+  if [ -z "$2" ]; then :; else
+      str="${CYAN}[$2]${NORMAL} $1"
+  fi
+  start_spinner "$str"
+}
+
+echo_update() {
+  local str
+  str="${CYAN}${NORMAL}$1"
+  if [ -z "$2" ]; then :; else
+      str="${CYAN}[$2]${NORMAL} $1"
+  fi
+  update_spinner "$str"
+}
+
+echo_completed() {
+  local str
+  str="${CYAN}${NORMAL}$1"
+  if [ -z "$2" ]; then :; else
+      str="${CYAN}[$2]${NORMAL} $1"
+  fi
+  stop_spinner "$str"
+}
+
 CYAN=$(tput setaf 6)
 NORMAL=$(tput sgr0)
 BOLD=$(tput bold)
-YELLOW=$(tput setaf 3)
 
 check_dep() {
     command -v $1 >/dev/null 2>&1 || { echo "Please install \`${BOLD}$1${NORMAL}\` before running this script." >&2; exit 1; }
@@ -99,7 +224,6 @@ reset_linode() {
     local DISK_IDS
     local CONFIG_IDS
     local STATUS
-    echo_pending "Retrieving current status" $LINODE_ID
     STATUS=$( get_status $LINODE_ID )
 
     if [ $STATUS = 1 ]; then
@@ -126,7 +250,6 @@ reset_linode() {
 
     echo_update "Waiting for all jobs to complete" $LINODE_ID
     wait_jobs $LINODE_ID
-    echo_completed "Node is reset" $LINODE_ID
 }
 
 list_plans() {
@@ -208,14 +331,13 @@ install() {
     local LINODE_ID
     local PLAN
     local ROOT_PASSWORD
-    local DISK_SIZE
     local COREOS_OLD_DISK_SIZE
     local COREOS_DISK_SIZE
     local STORAGE_DISK_SIZE
     NODE_TYPE=$1
     LINODE_ID=$2
     reset_linode $LINODE_ID
-    echo_pending "Installing $NODE_TYPE node" $LINODE_ID
+    echo_update "Installing $NODE_TYPE node" $LINODE_ID
     ROOT_PASSWORD=$( openssl rand -base64 32 )
 
     echo_update "Retrieving current plan" $LINODE_ID
@@ -341,32 +463,34 @@ EOF
 
     echo_update "Waiting for CoreOS to be ready" $LINODE_ID
     sleep 15
-    echo_completed "Starting to provision $NODE_TYPE node" $LINODE_ID
-
     if [ "$NODE_TYPE" = "master" ] ; then
         if [ -e ~/.kube-linode/acme.json ] ; then
-            echo_pending "Transferring acme.json" $LINODE_ID
+            echo_update "Transferring acme.json" $LINODE_ID
             ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
             "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 < ~/.kube-linode/acme.json )' \
              | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
-            echo_completed "Transferred acme.json" $LINODE_ID
         fi
     fi
+
+    echo_completed "Starting to provision $NODE_TYPE node" $LINODE_ID
+    tput cuu1
+    tput el
+
     ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
             "./bootstrap.sh" 2>/dev/null
+
+    tput cuu1
+    tput el
+
     echo_pending "Deleting bootstrap script" $LINODE_ID
     ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
             "rm bootstrap.sh" 2>/dev/null
-    echo_update "Bootstrap script deleted" $LINODE_ID
 
     echo_update "Changing status to provisioned" $LINODE_ID
     linode_api linode.update LinodeID=$LINODE_ID Label="${NODE_TYPE}_${LINODE_ID}" lpm_displayGroup="$DOMAIN" >/dev/null
-
-    echo_completed "Installed $NODE_TYPE node" $LINODE_ID
 }
 
 update_script() {
-  echo_pending "Updating install script"
   SCRIPT_ID=$( linode_api stackscript.list | jq ".DATA" | jq -c '.[] | select(.LABEL == "CoreOS_Kube_Cluster") | .STACKSCRIPTID' | sed -n 1p )
   if ! [[ $SCRIPT_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
       SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat ~/.kube-linode/install-coreos.sh )" \
@@ -374,7 +498,6 @@ update_script() {
   else
       linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat ~/.kube-linode/install-coreos.sh )" >/dev/null
   fi
-  echo_completed "Updated install script"
 }
 
 read_api_key() {
@@ -467,7 +590,7 @@ update_dns() {
   local IP_ADDRESS_ID
   local RESOURCE_IDS
   eval IP=\$IP_$LINODE_ID
-  echo_pending "Updating DNS record for $DOMAIN" $LINODE_ID
+  echo_update "Updating DNS record for $DOMAIN" $LINODE_ID
   DOMAIN_ID=$( linode_api domain.list | jq ".DATA" | jq -c ".[] | select(.DOMAIN == \"$DOMAIN\") | .DOMAINID" )
   if ! [[ $DOMAIN_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
       linode_api domain.create DomainID=$DOMAIN_ID Domain="$DOMAIN" TTL_sec=300 axfr_ips="none" Expire_sec=604800 \
@@ -496,7 +619,6 @@ update_dns() {
   echo_update "Updating reverse DNS record of $IP to $DOMAIN" $LINODE_ID
   IP_ADDRESS_ID=$( linode_api linode.ip.list | jq ".DATA" | jq -c ".[] | select(.IPADDRESS == \"$IP\") | .IPADDRESSID" | sed -n 1p )
   linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname="$DOMAIN" >/dev/null
-  echo_completed "Updated DNS record $DOMAIN" $LINODE_ID
 }
 
 read_no_of_workers() {
