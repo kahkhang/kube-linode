@@ -19,6 +19,9 @@ unset EMAIL
 unset MASTER_ID
 unset API_KEY
 
+stty -echo
+tput civis
+
 if [ -f ~/.kube-linode/settings.env ] ; then
     . ~/.kube-linode/settings.env
 else
@@ -51,41 +54,37 @@ update_script
 
 echo_pending "Retrieving master linode (if any)"
 MASTER_ID=$( get_master_id )
-echo_completed "Retrieved master linode" $MASTER_ID
 
 if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
-   echo_pending "Retrieving list of workers"
+   echo_update "Retrieving list of workers"
    WORKER_IDS=$( list_worker_ids )
-   echo_completed "Retrieved list of workers"
    for WORKER_ID in $WORKER_IDS; do
-      echo_pending "Deleting worker (since certs are now invalid)" $WORKER_ID
+      echo_update "Deleting worker (since certs are now invalid)" $WORKER_ID
       linode_api linode.delete LinodeID=$WORKER_ID skipChecks=true >/dev/null
-      echo_completed "Deleted worker" $WORKER_ID
    done
    WORKER_ID=
 
-   echo_pending "Creating master linode"
+   echo_update "Creating master linode"
    MASTER_ID=$( linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$MASTER_PLAN | jq ".DATA.LinodeID" )
-   echo_completed "Created master linode $MASTER_ID"
 
-   echo_pending "Initializing labels" $MASTER_ID
+   echo_update "Initializing labels" $MASTER_ID
    linode_api linode.update LinodeID=$MASTER_ID Label="master_${MASTER_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)" >/dev/null
-   echo_pending "Initialized labels" $MASTER_ID
 
    if [ -d ~/.kube-linode/certs ]; then
-     echo_pending "Removing existing certificates" $MASTER_ID
+     echo_update "Removing existing certificates" $MASTER_ID
      rm -rf ~/.kube-linode/certs;
-     echo_completed "Removed existing certificates" $MASTER_ID
    fi
+   echo_update "Creating master linode"
 fi
 
-grab_ip $MASTER_ID
-MASTER_IP=$( eval echo \$PUBLIC_$MASTER_ID )
+echo_update "Getting IP" $MASTER_ID
+MASTER_IP=$(get_ip $MASTER_ID); declare "IP_$MASTER_ID=$MASTER_IP"
+echo_update "IP Address: $MASTER_IP" $MASTER_ID
 
-echo_pending "Retrieving provision status" $MASTER_ID
+echo_update "Retrieving provision status" $MASTER_ID
 if [ "$( is_provisioned $MASTER_ID )" = false ] ; then
   echo_completed "Master node not provisioned" $MASTER_ID
-  update_dns $MASTER_ID &
+  update_dns $MASTER_ID
   install master $MASTER_ID
 
   echo_pending "Setting defaults for kubectl"
@@ -100,7 +99,7 @@ fi
 
 echo_pending "Retrieving current number of workers" $MASTER_ID
 CURRENT_NO_OF_WORKERS=$( echo "$( list_worker_ids | wc -l ) + 0" | bc )
-echo_completed "Current number of workers: $CURRENT_NO_OF_WORKERS" $MASTER_ID
+echo_update "Current number of workers: $CURRENT_NO_OF_WORKERS" $MASTER_ID
 
 NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
 echo_completed "Number of new workers to add: $NO_OF_NEW_WORKERS" $MASTER_ID
@@ -116,22 +115,26 @@ fi
 
 echo_pending "Retrieving list of workers" $MASTER_ID
 WORKER_IDS=$( list_worker_ids )
-echo_pending "Retrieved list of workers" $MASTER_ID
+echo_completed "Retrieved list of workers" $MASTER_ID
 
 for WORKER_ID in $WORKER_IDS; do
-   grab_ip $WORKER_ID
+   echo_pending "Getting IP" $WORKER_ID
+   IP=$(get_ip $WORKER_ID); declare "IP_$WORKER_ID=$IP"
+   echo_completed "IP Address: $IP" $WORKER_ID
    echo_pending "Retrieving provision status" $WORKER_ID
    if [ "$( is_provisioned $WORKER_ID )" = false ] ; then
      echo_completed "Worker not provisioned" $WORKER_ID
-     install worker $WORKER_ID &
+     install worker $WORKER_ID
    else
      echo_completed "Worker provisioned" $WORKER_ID
    fi
 done
 
-trap 'kill $(jobs -p) 2>/dev/null' EXIT
+trap 'kill $(jobs -p) >/dev/null' EXIT
 wait
 
 echo "Cluster provisioned successfully!"
 echo "Worker nodes might take a while to appear on the dashboard."
 echo "Go to https://kube.$DOMAIN and https://traefik.$DOMAIN to monitor your cluster."
+tput cnorm
+stty echo

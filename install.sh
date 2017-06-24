@@ -12,6 +12,7 @@ echo -ne '#############             (66%)\r'
 curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/kube-linode.sh > ~/.kube-linode/kube-linode.sh
 echo -ne '####################      (90%)\r'
 curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/utilities.sh > ~/.kube-linode/utilities.sh
+curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/spinner.sh > ~/.kube-linode/spinner.sh
 
 chmod +x ~/.kube-linode/install-coreos.sh
 chmod +x ~/.kube-linode/kube-linode.sh
