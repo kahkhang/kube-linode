@@ -252,12 +252,6 @@ reset_linode() {
     wait_jobs $LINODE_ID
 }
 
-list_plans() {
-  echo ""
-  linode_api avail.linodeplans | jq ".DATA" | jq -r '.[] | [.PLANID, .RAM, .DISK, .PRICE] | @csv' | \
-    awk -v FS="," 'BEGIN{print "--------------------------------------------------------";print "PlanID\tRAM (mb)\tDisk (gb)\tCost Per Month";print "--------------------------------------------------------"}{gsub(/"/g, "", $1); printf "%s\t%s\t\t%s\t\tUS\$%s%s",$1,$2,$3,$4,ORS}END{ print "--------------------------------------------------------" }'
-}
-
 get_ip() {
   local LINODE_ID=$1
   local IP
@@ -503,31 +497,38 @@ update_script() {
 read_api_key() {
   if ! [[ $API_KEY =~ ^[0-9a-zA-Z]+$ ]] 2>/dev/null; then
       while ! [[ $API_KEY =~ ^-?[0-9a-zA-Z]+$ ]] 2>/dev/null; do
-         printf "Enter Linode API Key (https://manager.linode.com/profile/api) : "
-         read API_KEY
+         text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
       done
       while ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; do
-         printf "Enter Linode API Key (https://manager.linode.com/profile/api) : "
-         read API_KEY
+         text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
       done
       echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
   else
       if ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; then
         while ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; do
-           printf "Enter Linode API Key (https://manager.linode.com/profile/api) : "
-           read API_KEY
+           text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
         done
         echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
       fi
   fi
+  tput civis
 }
 
 read_master_plan() {
   if ! [[ $MASTER_PLAN =~ ^[0-9]+$ ]] 2>/dev/null; then
-      list_plans
       while ! [[ $MASTER_PLAN =~ ^-?[0-9]+$ ]] 2>/dev/null; do
-         printf "Enter PlanID for master node: "
-         read MASTER_PLAN
+         IFS=$'\n'
+         echo_pending "Retrieving plans"
+         local plan_data=$(linode_api avail.linodeplans | jq ".DATA | sort_by(.PRICE)")
+         echo_completed "Retrieved plans"
+         tput cuu1
+         tput el
+         local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
+         local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
+           awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' ))
+         list_input_index "Select a master plan (https://www.linode.com/pricing)" plan_list selected_disk_id
+
+         MASTER_PLAN=${plan_ids[$selected_disk_id]}
       done
       echo "MASTER_PLAN=$MASTER_PLAN" >> ~/.kube-linode/settings.env
   fi
@@ -536,27 +537,38 @@ read_master_plan() {
 
 read_worker_plan() {
   if ! [[ $WORKER_PLAN =~ ^[0-9]+$ ]] 2>/dev/null; then
-      list_plans
       while ! [[ $WORKER_PLAN =~ ^-?[0-9]+$ ]] 2>/dev/null; do
-         printf "Enter PlanID for worker node: "
-         read WORKER_PLAN
+         IFS=$'\n'
+         echo_pending "Retrieving plans"
+         local plan_data=$(linode_api avail.linodeplans | jq ".DATA | sort_by(.PRICE)")
+         echo_completed "Retrieved plans"
+         tput cuu1
+         tput el
+         local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
+         local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
+           awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' ))
+         list_input_index "Select a worker plan (https://www.linode.com/pricing)" plan_list selected_disk_id
+
+         WORKER_PLAN=${plan_ids[$selected_disk_id]}
       done
       echo "WORKER_PLAN=$WORKER_PLAN" >> ~/.kube-linode/settings.env
   fi
 
 }
 
-list_datacenters() {
-  linode_api avail.datacenters | jq ".DATA" | jq -r '.[] | [.DATACENTERID, .LOCATION] | @csv' | \
-    awk -v FS="," 'BEGIN{print "--------------------------";print "ID\tLocation";print "--------------------------"}{gsub(/"/, "", $2); printf "%s\t%s%s",$1,$2,ORS}END{print "--------------------------"}'
-}
-
 read_datacenter() {
   if ! [[ $DATACENTER_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
-      list_datacenters
       while ! [[ $DATACENTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; do
-         printf "Enter ID for Data Center: "
-         read DATACENTER_ID
+         IFS=$'\n'
+         echo_pending "Retrieving datacenters"
+         datacenters_data=$(linode_api avail.datacenters | jq ".DATA | sort_by(.LOCATION)")
+         echo_completed "Retrieved datacenters"
+         tput cuu1
+         tput el
+         datacenters_ids=($(echo $datacenters_data | jq -r '.[] | .DATACENTERID'))
+         datacenters_list=($(echo $datacenters_data | jq -r '.[] | .LOCATION'))
+         list_input_index "Select a datacenter" datacenters_list selected_data_center_index
+         DATACENTER_ID=${datacenters_ids[$selected_data_center_index]}
       done
       echo "DATACENTER_ID=$DATACENTER_ID" >> ~/.kube-linode/settings.env
   fi
@@ -565,22 +577,22 @@ read_datacenter() {
 read_domain() {
   if ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; then
       while ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; do
-         printf "Enter Domain Name: "
-         read DOMAIN
+         text_input "Enter Domain Name: " DOMAIN "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$" "Please enter a valid domain name"
       done
       echo "DOMAIN=$DOMAIN" >> ~/.kube-linode/settings.env
   fi
+  tput civis
 }
 
 read_email() {
   email_regex="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
   if ! [[ $EMAIL =~ $email_regex ]] 2>/dev/null; then
       while ! [[ $EMAIL =~ $email_regex ]] 2>/dev/null; do
-         printf "Enter Email: "
-         read EMAIL
+         text_input "Enter Email: " EMAIL "^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$" "Please enter a valid email"
       done
       echo "EMAIL=$EMAIL" >> ~/.kube-linode/settings.env
   fi
+  tput civis
 }
 
 update_dns() {
@@ -623,12 +635,12 @@ update_dns() {
 
 read_no_of_workers() {
   if ! [[ $NO_OF_WORKERS =~ ^[0-9]+$ ]] 2>/dev/null; then
-      while ! [[ $NO_OF_WORKERS =~ ^-?[0-9]+$ ]] 2>/dev/null; do
-         printf "Enter number of workers: "
-         read NO_OF_WORKERS
+      while ! [[ $NO_OF_WORKERS =~ ^[0-9]+$ ]] 2>/dev/null; do
+         text_input "Enter number of workers: " NO_OF_WORKERS "^[0-9]+$" "Please enter a number"
       done
       echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> ~/.kube-linode/settings.env
   fi
+  tput civis
 }
 
 ## Start of Inquirer.sh (https://github.com/tanhauhau/Inquirer.sh)
@@ -729,255 +741,6 @@ select_indices() {
     eval $_select_var_name\+\=\(\""${_select_list[${_select_indices[$i]}]}"\"\)
   done
 }
-
-on_text_input_left() {
-  remove_regex_failed
-  if [ $_current_pos -gt 0 ]; then
-    tput cub1
-    _current_pos=$(($_current_pos-1))
-  fi
-}
-
-on_text_input_right() {
-  remove_regex_failed
-  if [ $_current_pos -lt ${#_text_input} ]; then
-    tput cuf1
-    _current_pos=$(($_current_pos+1))
-  fi
-}
-
-on_text_input_enter() {
-  remove_regex_failed
-  if [[ "$_text_input" =~ $_text_input_regex ]]; then
-    tput cub "$(tput cols)"
-    tput cuf $((${#_read_prompt}-19))
-    printf "${cyan}${_text_input}${normal}"
-    tput el
-    tput cud1
-    tput cub "$(tput cols)"
-    tput el
-    eval $var_name=\'"${_text_input}"\'
-    _break_keypress=true
-  else
-    _text_input_regex_failed=true
-    tput civis
-    tput cud1
-    tput cub "$(tput cols)"
-    tput el
-    printf "${red}>>${normal} $_text_input_regex_failed_msg"
-    tput cuu1
-    tput cub "$(tput cols)"
-    tput cuf $((${#_read_prompt}-19))
-    tput el
-    _text_input=""
-    _current_pos=0
-    tput cnorm
-  fi
-}
-
-on_text_input_ascii() {
-  remove_regex_failed
-  local c=$1
-
-  if [ "$c" = '' ]; then
-    c=' '
-  fi
-
-  local rest="${_text_input:$_current_pos}"
-  _text_input="${_text_input:0:$_current_pos}$c$rest"
-  _current_pos=$(($_current_pos+1))
-
-  tput civis
-  printf "$c$rest"
-  tput el
-  if [ ${#rest} -gt 0 ]; then
-    tput cub ${#rest}
-  fi
-  tput cnorm
-}
-
-on_text_input_backspace() {
-  remove_regex_failed
-  if [ $_current_pos -gt 0 ]; then
-    local start="${_text_input:0:$(($_current_pos-1))}"
-    local rest="${_text_input:$_current_pos}"
-    _current_pos=$(($_current_pos-1))
-    tput cub 1
-    tput el
-    tput sc
-    printf "$rest"
-    tput rc
-    _text_input="$start$rest"
-  fi
-}
-
-remove_regex_failed() {
-  if [ $_text_input_regex_failed = true ]; then
-    _text_input_regex_failed=false
-    tput sc
-    tput cud1
-    tput cub "$(tput cols)"
-    tput el
-    tput rc
-  fi
-}
-
-text_input() {
-  prompt=$1
-  local var_name=$2
-  _text_input_regex="${3:-"\.+"}"
-  _text_input_regex_failed_msg=${4:-"Input validation failed"}
-  local _read_prompt_start=$'\e[32m?\e[39m\e[1m'
-  local _read_prompt_end=$'\e[22m'
-  _read_prompt="$( echo "$_read_prompt_start ${prompt} $_read_prompt_end")"
-  _current_pos=0
-  _text_input_regex_failed=false
-  _text_input=""
-  printf "$_read_prompt"
-
-
-  trap control_c SIGINT EXIT
-
-  stty -echo
-
-  on_keypress on_default on_default on_text_input_ascii on_text_input_enter on_text_input_left on_text_input_right on_text_input_ascii on_text_input_backspace
-  eval $var_name=\'"${_text_input}"\'
-  unset _text_input_regex
-  unset _text_input_regex_failed_msg
-  unset _read_prompt
-  unset _current_pos
-  unset _text_input_regex_failed
-  unset _text_input
-}
-
-on_list_input_up() {
-  remove_list_instructions
-  tput cub "$(tput cols)"
-
-  printf "  ${_list_options[$_list_selected_index]}"
-  tput el
-
-  if [ $_list_selected_index = 0 ]; then
-    _list_selected_index=$((${#_list_options[@]}-1))
-    tput cud $((${#_list_options[@]}-1))
-    tput cub "$(tput cols)"
-  else
-    _list_selected_index=$((_list_selected_index-1))
-
-    tput cuu1
-    tput cub "$(tput cols)"
-    tput el
-  fi
-
-  printf "${cyan}${arrow} %s ${normal}" "${_list_options[$_list_selected_index]}"
-}
-
-on_list_input_down() {
-  remove_list_instructions
-  tput cub "$(tput cols)"
-
-  printf "  ${_list_options[$_list_selected_index]}"
-  tput el
-
-  if [ $_list_selected_index = $((${#_list_options[@]}-1)) ]; then
-    _list_selected_index=0
-    tput cuu $((${#_list_options[@]}-1))
-    tput cub "$(tput cols)"
-  else
-    _list_selected_index=$((_list_selected_index+1))
-    tput cud1
-    tput cub "$(tput cols)"
-    tput el
-  fi
-  printf "${cyan}${arrow} %s ${normal}" "${_list_options[$_list_selected_index]}"
-}
-
-on_list_input_enter_space() {
-  local OLD_IFS
-  OLD_IFS=$IFS
-  IFS=$'\n'
-  tput cuu $((${_list_selected_index}+1))
-  tput cub "$(tput cols)"
-
-
-  tput cuf $((${#prompt}+3))
-  printf "${cyan}${_list_options[$_list_selected_index]}${normal}"
-  tput el
-
-  tput cud1
-  tput cub "$(tput cols)"
-  tput el
-
-  _break_keypress=true
-  IFS=$OLD_IFS
-}
-
-remove_list_instructions() {
-  if [ $_first_keystroke = true ]; then
-    tput cuu $((${_list_selected_index}+1))
-    tput cub "$(tput cols)"
-    tput cuf $((${#prompt}+3))
-    tput el
-    tput cud $((${_list_selected_index}+1))
-    _first_keystroke=false
-  fi
-}
-
-_list_input() {
-  local i
-  local j
-  prompt=$1
-  eval _list_options=( '"${'${2}'[@]}"' )
-
-  _list_selected_index=0
-  _first_keystroke=true
-
-  trap control_c SIGINT EXIT
-
-  stty -echo
-  tput civis
-
-  print "${normal}${green}?${normal} ${bold}${prompt}${normal} ${dim}(Use arrow keys)${normal}"
-
-  for i in $(gen_index ${#_list_options[@]}); do
-    tput cub "$(tput cols)"
-    if [ $i = 0 ]; then
-      print "${cyan}${arrow} ${_list_options[$i]} ${normal}"
-    else
-      print "  ${_list_options[$i]}"
-    fi
-    tput el
-  done
-
-  for j in $(gen_index ${#_list_options[@]}); do
-    tput cuu1
-  done
-
-  on_keypress on_list_input_up on_list_input_down on_list_input_enter_space on_list_input_enter_space
-
-}
-
-
-list_input() {
-  _list_input "$1" "$2"
-  local var_name=$3
-  eval $var_name=\'"${_list_options[$_list_selected_index]}"\'
-  unset _list_selected_index
-  unset _list_options
-  unset _break_keypress
-  unset _first_keystroke
-}
-
-list_input_index() {
-  _list_input "$1" "$2"
-  local var_name=$3
-  eval $var_name=\'"$_list_selected_index"\'
-  unset _list_selected_index
-  unset _list_options
-  unset _break_keypress
-  unset _first_keystroke
-}
-
 on_checkbox_input_up() {
   remove_checkbox_instructions
   tput cub "$(tput cols)"
@@ -1044,8 +807,6 @@ on_checkbox_input_enter() {
   _checkbox_selected_indices=()
   _checkbox_selected_options=()
   IFS=$'\n'
-  tput cuu $((${_current_index}+1))
-  tput cub "$(tput cols)"
 
   for i in $(gen_index ${#_checkbox_list[@]}); do
     if [ "${_checkbox_selected[$i]}" = true ]; then
@@ -1053,6 +814,16 @@ on_checkbox_input_enter() {
       _checkbox_selected_options+=("${_checkbox_list[$i]}")
     fi
   done
+
+  tput cud $((${#_checkbox_list[@]}-${_current_index}))
+  tput cub "$(tput cols)"
+
+  for i in $(seq $((${#_checkbox_list[@]}+1))); do
+    tput el1
+    tput el
+    tput cuu1
+  done
+  tput cub "$(tput cols)"
 
   tput cuf $((${#prompt}+3))
   printf "${cyan}$(join "${_checkbox_selected_options[@]}")${normal}"
@@ -1167,4 +938,259 @@ checkbox_input_indices() {
   unset _checkbox_selected_indices
   unset _checkbox_selected_options
 }
+on_list_input_up() {
+  remove_list_instructions
+  tput cub "$(tput cols)"
+
+  printf "  ${_list_options[$_list_selected_index]}"
+  tput el
+
+  if [ $_list_selected_index = 0 ]; then
+    _list_selected_index=$((${#_list_options[@]}-1))
+    tput cud $((${#_list_options[@]}-1))
+    tput cub "$(tput cols)"
+  else
+    _list_selected_index=$((_list_selected_index-1))
+
+    tput cuu1
+    tput cub "$(tput cols)"
+    tput el
+  fi
+
+  printf "${cyan}${arrow} %s ${normal}" "${_list_options[$_list_selected_index]}"
+}
+
+on_list_input_down() {
+  remove_list_instructions
+  tput cub "$(tput cols)"
+
+  printf "  ${_list_options[$_list_selected_index]}"
+  tput el
+
+  if [ $_list_selected_index = $((${#_list_options[@]}-1)) ]; then
+    _list_selected_index=0
+    tput cuu $((${#_list_options[@]}-1))
+    tput cub "$(tput cols)"
+  else
+    _list_selected_index=$((_list_selected_index+1))
+    tput cud1
+    tput cub "$(tput cols)"
+    tput el
+  fi
+  printf "${cyan}${arrow} %s ${normal}" "${_list_options[$_list_selected_index]}"
+}
+
+on_list_input_enter_space() {
+  local OLD_IFS
+  OLD_IFS=$IFS
+  IFS=$'\n'
+
+  tput cud $((${#_list_options[@]}-${_list_selected_index}))
+  tput cub "$(tput cols)"
+
+  for i in $(seq $((${#_list_options[@]}+1))); do
+    tput el1
+    tput el
+    tput cuu1
+  done
+  tput cub "$(tput cols)"
+
+  tput cuf $((${#prompt}+3))
+  printf "${cyan}${_list_options[$_list_selected_index]}${normal}"
+  tput el
+
+  tput cud1
+  tput cub "$(tput cols)"
+  tput el
+
+  _break_keypress=true
+  IFS=$OLD_IFS
+}
+
+remove_list_instructions() {
+  if [ $_first_keystroke = true ]; then
+    tput cuu $((${_list_selected_index}+1))
+    tput cub "$(tput cols)"
+    tput cuf $((${#prompt}+3))
+    tput el
+    tput cud $((${_list_selected_index}+1))
+    _first_keystroke=false
+  fi
+}
+
+_list_input() {
+  local i
+  local j
+  prompt=$1
+  eval _list_options=( '"${'${2}'[@]}"' )
+
+  _list_selected_index=0
+  _first_keystroke=true
+
+  trap control_c SIGINT EXIT
+
+  stty -echo
+  tput civis
+
+  print "${normal}${green}?${normal} ${bold}${prompt}${normal} ${dim}(Use arrow keys)${normal}"
+
+  for i in $(gen_index ${#_list_options[@]}); do
+    tput cub "$(tput cols)"
+    if [ $i = 0 ]; then
+      print "${cyan}${arrow} ${_list_options[$i]} ${normal}"
+    else
+      print "  ${_list_options[$i]}"
+    fi
+    tput el
+  done
+
+  for j in $(gen_index ${#_list_options[@]}); do
+    tput cuu1
+  done
+
+  on_keypress on_list_input_up on_list_input_down on_list_input_enter_space on_list_input_enter_space
+
+}
+
+
+list_input() {
+  _list_input "$1" "$2"
+  local var_name=$3
+  eval $var_name=\'"${_list_options[$_list_selected_index]}"\'
+  unset _list_selected_index
+  unset _list_options
+  unset _break_keypress
+  unset _first_keystroke
+}
+
+list_input_index() {
+  _list_input "$1" "$2"
+  local var_name=$3
+  eval $var_name=\'"$_list_selected_index"\'
+  unset _list_selected_index
+  unset _list_options
+  unset _break_keypress
+  unset _first_keystroke
+}
+on_text_input_left() {
+  remove_regex_failed
+  if [ $_current_pos -gt 0 ]; then
+    tput cub1
+    _current_pos=$(($_current_pos-1))
+  fi
+}
+
+on_text_input_right() {
+  remove_regex_failed
+  if [ $_current_pos -lt ${#_text_input} ]; then
+    tput cuf1
+    _current_pos=$(($_current_pos+1))
+  fi
+}
+
+on_text_input_enter() {
+  remove_regex_failed
+  if [[ "$_text_input" =~ $_text_input_regex ]]; then
+    tput cub "$(tput cols)"
+    tput cuf $((${#_read_prompt}-19))
+    printf "${cyan}${_text_input}${normal}"
+    tput el
+    tput cud1
+    tput cub "$(tput cols)"
+    tput el
+    eval $var_name=\'"${_text_input}"\'
+    _break_keypress=true
+  else
+    _text_input_regex_failed=true
+    tput civis
+    tput cud1
+    tput cub "$(tput cols)"
+    tput el
+    printf "${red}>>${normal} $_text_input_regex_failed_msg"
+    tput cuu1
+    tput cub "$(tput cols)"
+    tput cuf $((${#_read_prompt}-19))
+    tput el
+    _text_input=""
+    _current_pos=0
+    tput cnorm
+  fi
+}
+
+on_text_input_ascii() {
+  remove_regex_failed
+  local c=$1
+
+  if [ "$c" = '' ]; then
+    c=' '
+  fi
+
+  local rest="${_text_input:$_current_pos}"
+  _text_input="${_text_input:0:$_current_pos}$c$rest"
+  _current_pos=$(($_current_pos+1))
+
+  tput civis
+  printf "$c$rest"
+  tput el
+  if [ ${#rest} -gt 0 ]; then
+    tput cub ${#rest}
+  fi
+  tput cnorm
+}
+
+on_text_input_backspace() {
+  remove_regex_failed
+  if [ $_current_pos -gt 0 ]; then
+    local start="${_text_input:0:$(($_current_pos-1))}"
+    local rest="${_text_input:$_current_pos}"
+    _current_pos=$(($_current_pos-1))
+    tput cub 1
+    tput el
+    tput sc
+    printf "$rest"
+    tput rc
+    _text_input="$start$rest"
+  fi
+}
+
+remove_regex_failed() {
+  if [ $_text_input_regex_failed = true ]; then
+    _text_input_regex_failed=false
+    tput sc
+    tput cud1
+    tput el1
+    tput el
+    tput rc
+  fi
+}
+
+text_input() {
+  prompt=$1
+  local var_name=$2
+  _text_input_regex="${3:-"\.+"}"
+  _text_input_regex_failed_msg=${4:-"Input validation failed"}
+  local _read_prompt_start=$'\e[32m?\e[39m\e[1m'
+  local _read_prompt_end=$'\e[22m'
+  _read_prompt="$( echo "$_read_prompt_start ${prompt} $_read_prompt_end")"
+  _current_pos=0
+  _text_input_regex_failed=false
+  _text_input=""
+  printf "$_read_prompt"
+
+
+  trap control_c SIGINT EXIT
+
+  stty -echo
+  tput cnorm
+
+  on_keypress on_default on_default on_text_input_ascii on_text_input_enter on_text_input_left on_text_input_right on_text_input_ascii on_text_input_backspace
+  eval $var_name=\'"${_text_input}"\'
+  unset _text_input_regex
+  unset _text_input_regex_failed_msg
+  unset _read_prompt
+  unset _current_pos
+  unset _text_input_regex_failed
+  unset _text_input
+}
+
 ##
