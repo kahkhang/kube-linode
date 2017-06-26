@@ -42,6 +42,8 @@ if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     echo_pending "Generating new SSH key"
     ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
     echo_completed "Generating new SSH key"
+else
+    ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa
 fi
 
 if [ -f ~/.kube-linode/auth ]  ; then : ; else
