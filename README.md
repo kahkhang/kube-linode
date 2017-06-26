@@ -4,6 +4,8 @@ Automatically provisions a scalable CoreOS/Kubernetes cluster on Linode, compris
 
 There is zero configuration needed (all you need is an API Key with a valid domain that uses [Linode's DNS servers](https://www.linode.com/docs/networking/dns/dns-manager-overview#set-domain-names-to-use-linodes-name-servers))
 
+![Screenshot](screenshot.png)
+
 ### What's included
 * Load Balancer and automatic SSL/TLS renewal using [Traefik](https://github.com/containous/traefik)
 * Two basic auth protected subdomains (assuming you are using example.com):

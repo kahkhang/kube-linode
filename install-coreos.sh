@@ -838,7 +838,7 @@ $( echo $CA_CERT | base64 --decode | sed 's/^/      /' )
           entryPoint = "https"
           onDemand = true
           onHostRule = true
-          caServer = "https://acme-v01.api.letsencrypt.org/directory"
+          caServer = "https://acme-staging.api.letsencrypt.org/directory"
           [[acme.domains]]
           main = "${DOMAIN}"
       ---
