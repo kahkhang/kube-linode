@@ -12,8 +12,17 @@ source $DIR/text_input.sh
 source $DIR/list_input.sh
 source $DIR/checkbox_input.sh
 
+set +e
+base64_args=""
+$(base64 --wrap=0 <(echo "test") >/dev/null 2>&1)
+if [ $? -eq 0 ]; then
+    base64_args="--wrap=0"
+fi
+set -e
+
 control_c() {
   echo_completed "Exiting"
+  stty sane
   tput cnorm
   stty echo
   exit $?
@@ -374,12 +383,12 @@ install() {
         echo_update "Initializing stackscript parameters" $LINODE_ID
         PARAMS=$( cat <<-EOF
           {
-              "admin_key_cert": "$( base64 < ~/.kube-linode/certs/admin-key.pem )",
-              "admin_cert": "$( base64 < ~/.kube-linode/certs/admin.pem )",
-              "apiserver_key_cert": "$( base64 < ~/.kube-linode/certs/apiserver-key.pem )",
-              "apiserver_cert": "$( base64 < ~/.kube-linode/certs/apiserver.pem )",
-              "ca_key_cert": "$( base64 < ~/.kube-linode/certs/ca-key.pem )",
-              "ca_cert": "$( base64 < ~/.kube-linode/certs/ca.pem )",
+              "admin_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin-key.pem )",
+              "admin_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin.pem )",
+              "apiserver_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/apiserver-key.pem )",
+              "apiserver_cert": "$( base64 $base64_args < ~/.kube-linode/certs/apiserver.pem )",
+              "ca_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca-key.pem )",
+              "ca_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
@@ -394,7 +403,7 @@ install() {
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 < ~/.kube-linode/auth )",
+              "AUTH" : "$( base64 $base64_args < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -406,9 +415,9 @@ EOF
         echo_update "Initializing stackscript parameters" $LINODE_ID
         PARAMS=$( cat <<-EOF
           {
-              "worker_key_cert": "$( base64 < ~/.kube-linode/certs/${IP}-worker-key.pem )",
-              "worker_cert": "$( base64 < ~/.kube-linode/certs/${IP}-worker.pem )",
-              "ca_cert": "$( base64 < ~/.kube-linode/certs/ca.pem )",
+              "worker_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker-key.pem )",
+              "worker_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker.pem )",
+              "ca_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
@@ -423,7 +432,7 @@ EOF
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 < ~/.kube-linode/auth )",
+              "AUTH" : "$( base64 $base64_args < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -473,7 +482,7 @@ EOF
         if [ -e ~/.kube-linode/acme.json ] ; then
             echo_update "Transferring acme.json" $LINODE_ID
             ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
-            "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 < ~/.kube-linode/acme.json )' \
+            "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < ~/.kube-linode/acme.json )' \
              | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
         fi
     fi
