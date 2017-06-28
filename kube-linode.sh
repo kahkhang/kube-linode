@@ -18,6 +18,12 @@ check_dep htpasswd
 check_dep kubectl
 check_dep ssh
 check_dep base64
+check_dep bc
+check_dep ssh-keygen
+check_dep openssl
+check_dep awk
+check_dep sed
+check_dep cat
 
 unset DATACENTER_ID
 unset MASTER_PLAN
