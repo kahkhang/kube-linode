@@ -632,20 +632,19 @@ update_dns() {
                            SOA_Email="$EMAIL" Retry_sec=300 status=1 Refresh_sec=300 Type=master >/dev/null
 
   echo_update "Retrieving list of resources for $DOMAIN" $LINODE_ID
-  RESOURCE_IDS=$( linode_api domain.resource.list DomainID=$DOMAIN_ID | jq ".DATA" | jq ".[] | .RESOURCEID" )
+  RESOURCE_LIST=$( linode_api domain.resource.list DomainID=$DOMAIN_ID | jq ".DATA" )
 
-  for RESOURCE_ID in $RESOURCE_IDS; do
-      echo_update "Deleting domain resource record $RESOURCE_ID" $LINODE_ID
-      linode_api domain.resource.delete DomainID=$DOMAIN_ID ResourceID=$RESOURCE_ID >/dev/null
-  done
+  if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .TARGET == \"$IP\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
+      echo_update "Adding 'A' DNS record to $DOMAIN with target $IP" $LINODE_ID
+      linode_api domain.resource.create DomainID=$DOMAIN_ID \
+                 TARGET="$IP" TTL_SEC=0 PORT=80 PROTOCOL="" PRIORITY=10 WEIGHT=5 TYPE="A" NAME="" >/dev/null
+  fi
 
-  echo_update "Adding 'A' DNS record to $DOMAIN with target $IP" $LINODE_ID
-  linode_api domain.resource.create DomainID=$DOMAIN_ID \
-             TARGET="$IP" TTL_SEC=0 PORT=80 PROTOCOL="" PRIORITY=10 WEIGHT=5 TYPE="A" NAME="" >/dev/null
-
-  echo_update "Adding wildcard 'CNAME' record with target $DOMAIN" $LINODE_ID
-  linode_api domain.resource.create DomainID=$DOMAIN_ID \
-             TARGET="$DOMAIN" TTL_SEC=0 PORT=80 PROTOCOL="" PRIORITY=10 WEIGHT=5 TYPE="CNAME" NAME="*" >/dev/null
+  if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"CNAME\" and .TARGET == \"$DOMAIN\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
+      echo_update "Adding wildcard 'CNAME' record with target $DOMAIN" $LINODE_ID
+      linode_api domain.resource.create DomainID=$DOMAIN_ID \
+                 TARGET="$DOMAIN" TTL_SEC=0 PORT=80 PROTOCOL="" PRIORITY=10 WEIGHT=5 TYPE="CNAME" NAME="*" >/dev/null
+  fi
 
   echo_update "Updating reverse DNS record of $IP to $DOMAIN" $LINODE_ID
   IP_ADDRESS_ID=$( linode_api linode.ip.list | jq ".DATA" | jq -c ".[] | select(.IPADDRESS == \"$IP\") | .IPADDRESSID" | sed -n 1p )
