@@ -8,9 +8,7 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-source $DIR/text_input.sh
-source $DIR/list_input.sh
-source $DIR/checkbox_input.sh
+source $DIR/inquirer.sh
 
 set +e
 base64_args=""
