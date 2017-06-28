@@ -91,6 +91,7 @@ gen_index() {
 }
 
 control_c() {
+  stty sane
   tput cnorm
   stty echo
   exit $?

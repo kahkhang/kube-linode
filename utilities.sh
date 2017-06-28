@@ -546,7 +546,7 @@ read_master_plan() {
          tput el
          local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
          local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
-           awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' ))
+           awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' 2>/dev/null))
          list_input_index "Select a master plan (https://www.linode.com/pricing)" plan_list selected_disk_id
 
          MASTER_PLAN=${plan_ids[$selected_disk_id]}
@@ -567,7 +567,7 @@ read_worker_plan() {
          tput el
          local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
          local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
-           awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' ))
+           awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' 2>/dev/null))
          list_input_index "Select a worker plan (https://www.linode.com/pricing)" plan_list selected_disk_id
 
          WORKER_PLAN=${plan_ids[$selected_disk_id]}
