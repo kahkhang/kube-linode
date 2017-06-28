@@ -15,18 +15,6 @@ There is zero configuration needed (all you need is an API Key with a valid doma
 * Metric collection using [Heapster](https://github.com/kubernetes/heapster)
 * [Local persistent volumes](https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/README.md)
 
-
-### Requirements
-This shell script uses the following programs: `jq`, `openssl`, `curl`, `htpasswd`.
-`htpasswd`, `openssl`, and `curl` should be preinstalled with MacOS.
-
-You should also have a Linode Account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
-
-To install using OSX's [homebrew](https://brew.sh/):
-```sh
-brew install jq openssl curl kubectl
-```
-
 ### Usage
 
 To install the script:
@@ -42,6 +30,14 @@ kube-linode
 Settings are stored in `~/.kube-linode/settings.env`.
 
 To increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `kube-linode` again.
+
+### Requirements
+You have a Linode Account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
+
+To install using OSX's [homebrew](https://brew.sh/):
+```sh
+brew install jq openssl curl kubectl
+```
 
 ### Acknowledgements
 This source code was based on APIC-NET's [k8s-cluster](https://github.com/APNIC-net/linode-k8s-cluster), using a
