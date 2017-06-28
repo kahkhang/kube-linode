@@ -59,7 +59,7 @@ if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     echo_completed "Generating new SSH key"
 else
     eval `ssh-agent -s` >/dev/null 2>&1
-    ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa
+    ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa >/dev/null 2>&1
 fi
 
 if [ -f ~/.kube-linode/auth ]  ; then : ; else
