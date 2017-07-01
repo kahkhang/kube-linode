@@ -141,130 +141,66 @@ $( echo $CA_CERT | base64 --decode | sed 's/^/      /' )
       BOLD=\$(tput bold)
       YELLOW=\$(tput setaf 3)
 
-      _spinner() {
-          local on_success=" Completed "
-          local on_fail="  Failed   "
-          local green
-          local red
-          green="\$(tput setaf 2)"
-          red="\$(tput setaf 5)"
-          nc="\$(tput sgr0)"
-          case \$1 in
-              start)
-                  let column=\$(tput cols)-\${#2}+10
-                  echo -ne \${2}
-                  printf "%\${column}s"
-                  i=0
-                  sp=( "[\$(echo -e '\xE2\x97\x8F')          ]"
-                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
-                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
-                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
-                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
-                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
-                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
-                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
-                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
-                       "[         \$(echo -e '\xE2\x97\x8F') ]"
-                       "[          \$(echo -e '\xE2\x97\x8F')]"
-                       "[         \$(echo -e '\xE2\x97\x8F') ]"
-                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
-                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
-                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
-                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
-                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
-                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
-                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
-                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
-                       "[\$(echo -e '\xE2\x97\x8F')          ]")
-                  delay=0.04
+      _SPINNER_POS=0
+      _TASK_OUTPUT=""
+      spinner() {
+          _TASK_OUTPUT=""
+          local delay=0.05
+          local list=( \$(echo -e '\xe2\xa0\x8b')
+                       \$(echo -e '\xe2\xa0\x99')
+                       \$(echo -e '\xe2\xa0\xb9')
+                       \$(echo -e '\xe2\xa0\xb8')
+                       \$(echo -e '\xe2\xa0\xbc')
+                       \$(echo -e '\xe2\xa0\xb4')
+                       \$(echo -e '\xe2\xa0\xa6')
+                       \$(echo -e '\xe2\xa0\xa7')
+                       \$(echo -e '\xe2\xa0\x87')
+                       \$(echo -e '\xe2\xa0\x8f'))
+          local i=\$_SPINNER_POS
+          local tempfile
+          tempfile=\$(mktemp)
 
-                  while :
-                  do
-                      printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\${sp[i]}"
-                      i=\$((i+1))
-                      i=\$((i%20))
-                      sleep \$delay
-                  done
-                  ;;
-              stop)
-                  if [[ -z \${3} ]]; then
-                      echo "spinner is not running.."
-                      exit 1
-                  fi
+          eval \$2 >> \$tempfile 2>/dev/null &
+          local pid=\$!
 
-                  kill \$3 > /dev/null 2>&1
-                  echo -ne "\r"
-                  echo -ne "\${4}"
-                  let column=\$(tput cols)-\${#4}+10
-                  printf "%\${column}s"
-                  # inform the user uppon success or failure
-                  echo -en "\b\b\b\b\b\b\b\b\b\b\b\b\b["
-                  if [[ \$2 -eq 0 ]]; then
-                      echo -en "\${green}\${on_success}\${nc}"
-                  else
-                      echo -en "\${red}\${on_fail}\${nc}"
-                  fi
-                  echo -e "]"
-                  ;;
-              update)
-                  if [[ -z \${3} ]]; then
-                      echo "spinner is not running.."
-                      exit 1
-                  fi
-                  kill \$3 > /dev/null 2>&1
-                  echo -ne "\r"
-                  ;;
-              *)
-                  echo "invalid argument, try {start/stop}"
-                  exit 1
-                  ;;
-          esac
+          tput sc
+          printf "%s %s" "\${list[i]}" "\$1"
+          tput el
+          tput rc
+
+          i=\$((\$i+1))
+          i=\$((\$i%10))
+
+          while [ "\$(ps a | awk '{print \$1}' | grep \$pid)" ]; do
+              printf "%s" "\${list[i]}"
+              i=\$((\$i+1))
+              i=\$((\$i%10))
+              sleep \$delay
+              printf "\b\b\b"
+          done
+          _TASK_OUTPUT="\$(cat \$tempfile)"
+          rm \$tempfile
+          _SPINNER_POS=\$i
+
+          if [ -z \$3 ]; then :; else
+            eval \$3=\'"\$_TASK_OUTPUT"\'
+          fi
       }
 
-      start_spinner() {
-          _spinner "start" "\${1}" &
-          _sp_pid=\$!
-          disown
+      start_flannel() {
+        sudo systemctl daemon-reload
+
+        while ! sudo systemctl start flanneld >/dev/null 2>&1; do sleep 5 ; done
+        sudo systemctl enable flanneld >/dev/null 2>&1
       }
 
-      stop_spinner() {
-          _spinner "stop" 0 \$_sp_pid "\$1"
-          unset _sp_pid
+      start_kubelet() {
+        sudo systemctl start kubelet >/dev/null
+        sudo systemctl enable kubelet >/dev/null 2>&1
       }
 
-      update_spinner() {
-          _spinner "update" 0 \$_sp_pid
-          unset _sp_pid
-          start_spinner "\${1}"
-      }
-
-      echo_pending() {
-        local str
-        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        start_spinner "\$str"
-      }
-
-      echo_update() {
-        local str
-        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        update_spinner "\$str"
-      }
-
-      echo_completed() {
-        local str
-        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        stop_spinner "\$str"
-      }
-
-      sudo systemctl daemon-reload
-      echo_pending "Starting flannel (might take a while)"
-      while ! sudo systemctl start flanneld >/dev/null 2>&1; do sleep 5 ; done
-      sudo systemctl enable flanneld >/dev/null 2>&1
-
-      echo_update "Starting kubelet"
-      sudo systemctl start kubelet >/dev/null
-      sudo systemctl enable kubelet >/dev/null 2>&1
-      echo_completed "Provisioned worker node"
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Starting flannel (might take a while)" start_flannel
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Starting kubelet" start_kubelet
       exit 0
 EOF
 
@@ -979,181 +915,126 @@ $( echo $AUTH | base64 --decode | sed 's/^/      /' )
       BOLD=\$(tput bold)
       YELLOW=\$(tput setaf 3)
 
-      _spinner() {
-          local on_success=" Completed "
-          local on_fail="  Failed   "
-          local green
-          local red
-          green="\$(tput setaf 2)"
-          red="\$(tput setaf 5)"
-          nc="\$(tput sgr0)"
-          case \$1 in
-              start)
-                  let column=\$(tput cols)-\${#2}+10
-                  echo -ne \${2}
-                  printf "%\${column}s"
-                  i=0
-                  sp=( "[\$(echo -e '\xE2\x97\x8F')          ]"
-                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
-                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
-                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
-                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
-                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
-                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
-                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
-                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
-                       "[         \$(echo -e '\xE2\x97\x8F') ]"
-                       "[          \$(echo -e '\xE2\x97\x8F')]"
-                       "[         \$(echo -e '\xE2\x97\x8F') ]"
-                       "[        \$(echo -e '\xE2\x97\x8F')  ]"
-                       "[       \$(echo -e '\xE2\x97\x8F')   ]"
-                       "[      \$(echo -e '\xE2\x97\x8F')    ]"
-                       "[     \$(echo -e '\xE2\x97\x8F')     ]"
-                       "[    \$(echo -e '\xE2\x97\x8F')      ]"
-                       "[   \$(echo -e '\xE2\x97\x8F')       ]"
-                       "[  \$(echo -e '\xE2\x97\x8F')        ]"
-                       "[ \$(echo -e '\xE2\x97\x8F')         ]"
-                       "[\$(echo -e '\xE2\x97\x8F')          ]")
-                  delay=0.04
+      _SPINNER_POS=0
+      _TASK_OUTPUT=""
+      spinner() {
+          _TASK_OUTPUT=""
+          local delay=0.05
+          local list=( \$(echo -e '\xe2\xa0\x8b')
+                       \$(echo -e '\xe2\xa0\x99')
+                       \$(echo -e '\xe2\xa0\xb9')
+                       \$(echo -e '\xe2\xa0\xb8')
+                       \$(echo -e '\xe2\xa0\xbc')
+                       \$(echo -e '\xe2\xa0\xb4')
+                       \$(echo -e '\xe2\xa0\xa6')
+                       \$(echo -e '\xe2\xa0\xa7')
+                       \$(echo -e '\xe2\xa0\x87')
+                       \$(echo -e '\xe2\xa0\x8f'))
+          local i=\$_SPINNER_POS
+          local tempfile
+          tempfile=\$(mktemp)
 
-                  while :
-                  do
-                      printf "\b\b\b\b\b\b\b\b\b\b\b\b\b\${sp[i]}"
-                      i=\$((i+1))
-                      i=\$((i%20))
-                      sleep \$delay
-                  done
-                  ;;
-              stop)
-                  if [[ -z \${3} ]]; then
-                      echo "spinner is not running.."
-                      exit 1
-                  fi
+          eval \$2 >> \$tempfile 2>/dev/null &
+          local pid=\$!
 
-                  kill \$3 > /dev/null 2>&1
-                  echo -ne "\r"
-                  echo -ne "\${4}"
-                  let column=\$(tput cols)-\${#4}+10
-                  printf "%\${column}s"
-                  # inform the user uppon success or failure
-                  echo -en "\b\b\b\b\b\b\b\b\b\b\b\b\b["
-                  if [[ \$2 -eq 0 ]]; then
-                      echo -en "\${green}\${on_success}\${nc}"
-                  else
-                      echo -en "\${red}\${on_fail}\${nc}"
-                  fi
-                  echo -e "]"
-                  ;;
-              update)
-                  if [[ -z \${3} ]]; then
-                      echo "spinner is not running.."
-                      exit 1
-                  fi
-                  kill \$3 > /dev/null 2>&1
-                  echo -ne "\r"
-                  ;;
-              *)
-                  echo "invalid argument, try {start/stop}"
-                  exit 1
-                  ;;
-          esac
+          tput sc
+          printf "%s %s" "\${list[i]}" "\$1"
+          tput el
+          tput rc
+
+          i=\$((\$i+1))
+          i=\$((\$i%10))
+
+          while [ "\$(ps a | awk '{print \$1}' | grep \$pid)" ]; do
+              printf "%s" "\${list[i]}"
+              i=\$((\$i+1))
+              i=\$((\$i%10))
+              sleep \$delay
+              printf "\b\b\b"
+          done
+          _TASK_OUTPUT="\$(cat \$tempfile)"
+          rm \$tempfile
+          _SPINNER_POS=\$i
+
+          if [ -z \$3 ]; then :; else
+            eval \$3=\'"\$_TASK_OUTPUT"\'
+          fi
       }
 
-      start_spinner() {
-          _spinner "start" "\${1}" &
-          _sp_pid=\$!
-          disown
+      install_kubectl() {
+        wget -q https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+        chmod +x kubectl
+        sudo mkdir -p /opt/bin
+        sudo mv kubectl /opt/bin/kubectl
+        export PATH=\$PATH:/opt/bin
       }
 
-      stop_spinner() {
-          _spinner "stop" 0 \$_sp_pid "\$1"
-          unset _sp_pid
+      start_etcd() {
+        sudo systemctl start etcd2 >/dev/null
+        sudo systemctl enable etcd2 >/dev/null 2>&1
+        sudo systemctl daemon-reload >/dev/null
+        while ! curl -s -X PUT -d "value={\"Network\":\"10.2.0.0/16\",\"Backend\":{\"Type\":\"vxlan\"}}" "${ETCD_ENDPOINT}/v2/keys/coreos.com/network/config" >/dev/null ; do sleep 5 ; done
       }
 
-      update_spinner() {
-          _spinner "update" 0 \$_sp_pid
-          unset _sp_pid
-          start_spinner "\${1}"
+      start_flannel() {
+        while ! sudo systemctl start flanneld >/dev/null 2>&1; do sleep 5 ; done
+        sudo systemctl enable flanneld >/dev/null 2>&1
       }
 
-      echo_pending() {
-        local str
-        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        start_spinner "\$str"
+      set_kubectl_defaults() {
+        kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=/etc/kubernetes/ssl/ca.pem >/dev/null
+        kubectl config set-credentials ${USERNAME} --certificate-authority=/etc/kubernetes/ssl/ca.pem --client-key=/etc/kubernetes/ssl/admin-key.pem --client-certificate=/etc/kubernetes/ssl/admin.pem >/dev/null
+        kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
+        kubectl config use-context default-context >/dev/null
       }
 
-      echo_update() {
-        local str
-        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        update_spinner "\$str"
+      start_kubelet() {
+        sudo systemctl start kubelet >/dev/null
+        sudo systemctl enable kubelet >/dev/null 2>&1
+        while ! curl -s http://127.0.0.1:8080/version >/dev/null 2>&1; do sleep 5 ; done
+        sleep 20
       }
 
-      echo_completed() {
-        local str
-        str="\${CYAN}[$LINODE_ID]\${NORMAL} \$1"
-        stop_spinner "\$str"
+      start_kube_dns() {
+        kubectl create -f kube-dns.yaml >/dev/null 2>&1
+        while ! kubectl get pods --namespace=kube-system | grep kube-dns | grep Running >/dev/null 2>&1; do sleep 5 ; done
+        sleep 10
       }
 
-      echo_pending "Installing kubectl"
-      wget -q https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-      chmod +x kubectl
-      sudo mkdir -p /opt/bin
-      sudo mv kubectl /opt/bin/kubectl
+      create_kube_secret() {
+        kubectl --namespace=kube-system create secret generic kubesecret --from-file /home/${USERNAME}/auth >/dev/null
+      }
+
+      install_traefik() {
+        kubectl create -f /home/${USERNAME}/traefik.yaml >/dev/null 2>&1
+        while ! kubectl get pods --namespace=kube-system | grep traefik | grep Running >/dev/null 2>&1; do sleep 5 ; done
+        sleep 10
+      }
+
+      install_heapster() {
+        kubectl create -f heapster.yaml >/dev/null 2>&1
+        while ! kubectl get pods --namespace=kube-system | grep heapster | grep Running >/dev/null 2>&1; do sleep 5 ; done
+      }
+
+      install_kube_dashboard() {
+        kubectl create -f kube-dashboard.yaml >/dev/null 2>&1
+        while ! kubectl get pods --namespace=kube-system | grep dashboard | grep Running >/dev/null 2>&1; do sleep 5 ; done
+      }
+
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing kubectl" install_kubectl
       export PATH=\$PATH:/opt/bin
-
-      echo_update "Starting etcd"
-      sudo systemctl start etcd2 >/dev/null
-      sudo systemctl enable etcd2 >/dev/null 2>&1
-      sudo systemctl daemon-reload >/dev/null
-      while ! curl -s -X PUT -d "value={\"Network\":\"10.2.0.0/16\",\"Backend\":{\"Type\":\"vxlan\"}}" "${ETCD_ENDPOINT}/v2/keys/coreos.com/network/config" >/dev/null ; do sleep 5 ; done
-
-      echo_update "Starting flannel (might take a while)"
-      while ! sudo systemctl start flanneld >/dev/null 2>&1; do sleep 5 ; done
-      sudo systemctl enable flanneld >/dev/null 2>&1
-
-      echo_update "Setting defaults for kubectl"
-      kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=/etc/kubernetes/ssl/ca.pem >/dev/null
-      kubectl config set-credentials ${USERNAME} --certificate-authority=/etc/kubernetes/ssl/ca.pem --client-key=/etc/kubernetes/ssl/admin-key.pem --client-certificate=/etc/kubernetes/ssl/admin.pem >/dev/null
-      kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
-      kubectl config use-context default-context >/dev/null
-
-      echo_update "Starting kubelet (might take a while)"
-      sudo systemctl start kubelet >/dev/null
-      sudo systemctl enable kubelet >/dev/null 2>&1
-      while ! curl -s http://127.0.0.1:8080/version >/dev/null 2>&1; do sleep 5 ; done
-      sleep 10
-
-      echo_update "Installing kube-dns"
-      kubectl create -f kube-dns.yaml >/dev/null 2>&1
-      while ! kubectl get pods --namespace=kube-system | grep kube-dns | grep Running >/dev/null 2>&1; do sleep 5 ; done
-      sleep 10
-
-      echo_update "Creating kube-secret"
-      kubectl --namespace=kube-system create secret generic kubesecret --from-file /home/${USERNAME}/auth >/dev/null
-
-      echo_update "Installing traefik"
-      kubectl create -f /home/${USERNAME}/traefik.yaml >/dev/null 2>&1
-      while ! kubectl get pods --namespace=kube-system | grep traefik | grep Running >/dev/null 2>&1; do sleep 5 ; done
-      sleep 10
-
-      echo_update "Installing heapster"
-      kubectl create -f heapster.yaml >/dev/null 2>&1
-      while ! kubectl get pods --namespace=kube-system | grep heapster | grep Running >/dev/null 2>&1; do sleep 5 ; done
-
-      echo_update "Installing kube-dashboard"
-      kubectl create -f kube-dashboard.yaml >/dev/null 2>&1
-      while ! kubectl get pods --namespace=kube-system | grep dashboard | grep Running >/dev/null 2>&1; do sleep 5 ; done
-
-      echo_update "Installing local storage class"
-      kubectl create -f local-storage-class.yaml >/dev/null 2>&1
-
-      echo_update "Creating local storage admin"
-      kubectl create -f local-storage-admin.yaml >/dev/null 2>&1
-
-      echo_update "Installing local storage provisioner"
-      kubectl create -f local-storage-provisioner.yaml >/dev/null 2>&1
-      echo_completed "Provisioning master node"
-
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Starting etcd" start_etcd
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Starting flannel (might take a while)" start_flannel
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Setting defaults for kubectl" set_kubectl_defaults
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Starting kubelet (might take a while)" start_kubelet
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing kube-dns" start_kube_dns
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Creating kube-secret" create_kube_secret
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing traefik" install_traefik
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing heapster" install_heapster
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing kube-dashboard" install_kube_dashboard
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing local storage class" "kubectl create -f local-storage-class.yaml >/dev/null 2>&1"
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Creating local storage admin" "kubectl create -f local-storage-admin.yaml >/dev/null 2>&1"
+      spinner "\${CYAN}[$LINODE_ID]\${NORMAL} Installing local storage provisioner" "kubectl create -f local-storage-provisioner.yaml >/dev/null 2>&1"
       exit 0
 EOF
 

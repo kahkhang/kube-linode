@@ -54,9 +54,7 @@ read_no_of_workers
 USERNAME=$( whoami )
 
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
-    echo_pending "Generating new SSH key"
-    ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
-    echo_completed "Generating new SSH key"
+    spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""
 else
     eval `ssh-agent -s` >/dev/null 2>&1
     ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa >/dev/null 2>&1
@@ -67,84 +65,62 @@ if [ -f ~/.kube-linode/auth ]  ; then : ; else
     htpasswd -c ~/.kube-linode/auth $USERNAME
 fi
 
-echo_pending "Updating install script"
-update_script
+spinner "Updating install script" update_script SCRIPT_ID
 
-echo_update "Retrieving master linode (if any)"
-MASTER_ID=$( get_master_id )
+spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
 
 if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
-   echo_update "Retrieving list of workers"
-   WORKER_IDS=$( list_worker_ids )
+   spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
    for WORKER_ID in $WORKER_IDS; do
-      echo_update "Deleting worker (since certs are now invalid)" $WORKER_ID
-      linode_api linode.delete LinodeID=$WORKER_ID skipChecks=true >/dev/null
+      spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker (since certs are now invalid)"\
+                  "linode_api linode.delete LinodeID=$WORKER_ID skipChecks=true"
    done
-   WORKER_ID=
 
-   echo_update "Creating master linode"
-   MASTER_ID=$( linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$MASTER_PLAN | jq ".DATA.LinodeID" )
+   spinner "Creating master linode" "create_linode $DATACENTER_ID $MASTER_PLAN" MASTER_ID
 
-   echo_update "Initializing labels" $MASTER_ID
-   linode_api linode.update LinodeID=$MASTER_ID Label="master_${MASTER_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)" >/dev/null
+   spinner "${CYAN}[$MASTER_ID]${NORMAL} Initializing labels" \
+           "linode_api linode.update LinodeID=$MASTER_ID Label=\"master_${MASTER_ID}\" lpm_displayGroup=\"$DOMAIN (Unprovisioned)\""
 
    if [ -d ~/.kube-linode/certs ]; then
-     echo_update "Removing existing certificates" $MASTER_ID
-     rm -rf ~/.kube-linode/certs;
+     spinner "${CYAN}[$MASTER_ID]${NORMAL} Removing existing certificates" "rm -rf ~/.kube-linode/certs"
    fi
-   echo_update "Creating master linode"
 fi
 
-echo_update "Getting IP" $MASTER_ID
-MASTER_IP=$(get_ip $MASTER_ID); declare "IP_$MASTER_ID=$MASTER_IP"
-echo_update "IP Address: $MASTER_IP" $MASTER_ID
+spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting IP" "get_ip $MASTER_ID" MASTER_IP
+declare "IP_$MASTER_ID=$MASTER_IP"
 
-echo_update "Retrieving provision status" $MASTER_ID
-if [ "$( is_provisioned $MASTER_ID )" = false ] ; then
-  echo_update "Master node not provisioned" $MASTER_ID
+spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving provision status" "is_provisioned $MASTER_ID" IS_PROVISIONED
+
+if [ $IS_PROVISIONED = false ] ; then
   update_dns $MASTER_ID
   install master $MASTER_ID
-
-  echo_update "Setting defaults for kubectl"
-  kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=$HOME/.kube-linode/certs/ca.pem >/dev/null
-  kubectl config set-credentials ${USERNAME} --certificate-authority=$HOME/.kube-linode/certs/ca.pem --client-key=$HOME/.kube-linode/certs/admin-key.pem --client-certificate=$HOME/.kube-linode/certs/admin.pem >/dev/null
-  kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
-  kubectl config use-context default-context >/dev/null
+  spinner "${CYAN}[$MASTER_ID]${NORMAL} Setting defaults for kubectl" set_kubectl_defaults
 fi
-echo_completed "Master provisioned (IP: $MASTER_IP)" $MASTER_ID
 
-echo_pending "Retrieving current number of workers" $MASTER_ID
-CURRENT_NO_OF_WORKERS=$( echo "$( list_worker_ids | wc -l ) + 0" | bc )
-echo_update "Current number of workers: $CURRENT_NO_OF_WORKERS" $MASTER_ID
+tput el
+echo "${CYAN}[$MASTER_ID]${NORMAL} Master provisioned (IP: $MASTER_IP)"
 
+spinner "${CYAN}[$MASTER_ID]${NORMAL} current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
 NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
-echo_update "Number of new workers to add: $NO_OF_NEW_WORKERS" $MASTER_ID
 
 if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
     for WORKER in $( seq $NO_OF_NEW_WORKERS ); do
-        echo_update "Creating worker linode" $MASTER_ID
-        WORKER_ID=$( linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$WORKER_PLAN | jq ".DATA.LinodeID" )
+        spinner "Creating worker linode" "create_linode $DATACENTER_ID $WORKER_PLAN" WORKER_ID
         linode_api linode.update LinodeID=$WORKER_ID Label="worker_${WORKER_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)" >/dev/null
-        echo_update "Created worker linode" $WORKER_ID
+        spinner "Initializing labels" "change_to_unprovisioned $WORKER_ID worker"
     done
 fi
 
-echo_update "Retrieving list of workers" $MASTER_ID
-WORKER_IDS=$( list_worker_ids )
-echo_completed "Retrieved list of workers" $MASTER_ID
-tput cuu1
-tput el
+spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving list of workers" list_worker_ids WORKER_IDS
 
 for WORKER_ID in $WORKER_IDS; do
-   echo_pending "Getting IP" $WORKER_ID
-   IP=$(get_ip $WORKER_ID); declare "IP_$WORKER_ID=$IP"
-   echo_update "IP Address: $IP" $WORKER_ID
-   echo_update "Retrieving provision status" $WORKER_ID
+   spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting IP" "get_ip $WORKER_ID" IP
+   declare "IP_$WORKER_ID=$IP"
    if [ "$( is_provisioned $WORKER_ID )" = false ] ; then
-     echo_update "Worker not provisioned" $WORKER_ID
      install worker $WORKER_ID
    fi
-   echo_completed "Worker provisioned (IP: $IP)" $WORKER_ID
+   tput el
+   echo "${CYAN}[$WORKER_ID]${NORMAL} Worker provisioned (IP: $IP)"
 done
 
 wait

@@ -12,6 +12,7 @@ curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/
 echo -ne '#############             (66%)\r'
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/kube-linode.sh > ~/.kube-linode/kube-linode.sh
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/inquirer.sh > ~/.kube-linode/inquirer.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/ora.sh > ~/.kube-linode/ora.sh
 echo -ne '####################      (90%)\r'
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/utilities.sh > ~/.kube-linode/utilities.sh
 
