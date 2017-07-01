@@ -312,7 +312,11 @@ install() {
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
+<<<<<<< HEAD
               "k8s_ver": "v1.7.0_coreos.0",
+=======
+              "k8s_ver": "v1.7.0-rc.1_coreos.0",
+>>>>>>> 52a7afe21a61f549248bc9ded4c90838e8c44e48
               "dns_service_ip": "10.3.0.10",
               "k8s_service_ip": "10.3.0.1",
               "service_ip_range": "10.3.0.0/24",
@@ -340,7 +344,11 @@ EOF
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
+<<<<<<< HEAD
               "k8s_ver": "v1.7.0_coreos.0",
+=======
+              "k8s_ver": "v1.7.0-rc.1_coreos.0",
+>>>>>>> 52a7afe21a61f549248bc9ded4c90838e8c44e48
               "dns_service_ip": "10.3.0.10",
               "k8s_service_ip": "10.3.0.1",
               "service_ip_range": "10.3.0.0/24",
@@ -388,7 +396,7 @@ EOF
 
     ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
             "./bootstrap.sh" 2>/dev/null
-    
+
     tput el
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting bootstrap script" delete_bootstrap_script
@@ -514,7 +522,7 @@ get_domains() {
 
 get_resources() {
   local DOMAIN_ID=$1
-  linode_api domain.resource.list DomainID=$DOMAIN_ID | jq ".DATA" | jq ".[] | .RESOURCEID"
+  linode_api domain.resource.list DomainID=$DOMAIN_ID | jq ".DATA"
 }
 
 create_A_domain() {
@@ -548,23 +556,22 @@ update_dns() {
   local IP_ADDRESS_ID
   local RESOURCE_IDS
   eval IP=\$IP_$LINODE_ID
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \'$DOMAIN\'" DOMAIN_ID
+  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
   if ! [[ $DOMAIN_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating DNS record for $DOMAIN" create_domain
   fi
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \'$DOMAIN\'" DOMAIN_ID
+  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating DNS record for $DOMAIN" update_domain
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving list of resources for $DOMAIN" "get_resources $DOMAIN_ID" RESOURCE_IDS
+  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving list of resources for $DOMAIN" "get_resources $DOMAIN_ID" RESOURCE_LIST
 
-  for RESOURCE_ID in $RESOURCE_IDS; do
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting domain resource record $RESOURCE_ID" \
-              "linode_api domain.resource.delete DomainID=$DOMAIN_ID ResourceID=$RESOURCE_ID"
-  done
+  if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .TARGET == \"$IP\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
+      spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding 'A' DNS record to $DOMAIN with target $IP" create_A_domain
+  fi
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding 'A' DNS record to $DOMAIN with target $IP" create_A_domain
-
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
+  if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"CNAME\" and .TARGET == \"$DOMAIN\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
+      spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
+  fi
 
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address id" get_ip_address_id IP_ADDRESS_ID
 
