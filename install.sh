@@ -6,6 +6,7 @@ echo -ne '                          (0%)\r'
 [ -e ~/.kube-linode/kube-linode.sh ] && rm ~/.kube-linode/kube-linode.sh
 [ -e ~/.kube-linode/utilities.sh ] && rm ~/.kube-linode/utilities.sh
 [ -e ~/.kube-linode/inquirer.sh ] && rm ~/.kube-linode/inquirer.sh
+[ -e ~/.kube-linode/ora.sh ] && rm ~/.kube-linode/ora.sh
 
 echo -ne '#####                     (33%)\r'
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/install-coreos.sh > ~/.kube-linode/install-coreos.sh
@@ -16,9 +17,7 @@ curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/
 echo -ne '####################      (90%)\r'
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/utilities.sh > ~/.kube-linode/utilities.sh
 
-chmod +x ~/.kube-linode/install-coreos.sh
 chmod +x ~/.kube-linode/kube-linode.sh
-chmod +x ~/.kube-linode/utilities.sh
 
 [ ! -e /usr/local/bin/kube-linode ] && ln -s ~/.kube-linode/kube-linode.sh /usr/local/bin/kube-linode
 hash kube-linode
