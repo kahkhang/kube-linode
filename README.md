@@ -13,7 +13,7 @@ There is zero configuration needed (all you need is an API Key with a valid doma
   * https://traefik.example.com ([Traefik Web UI](https://github.com/containous/traefik#web-ui))
 * [Flannel](https://github.com/coreos/flannel/blob/master/README.md) cluster networking
 * Metric collection using [Heapster](https://github.com/kubernetes/heapster)
-* [Local persistent volumes](https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/README.md)
+* Customizable [local persistent volumes](https://github.com/kubernetes-incubator/external-storage/blob/master/local-volume/README.md)
 
 ### Usage
 

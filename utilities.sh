@@ -242,7 +242,7 @@ boot_linode() {
 
 update_coreos_config() {
   linode_api linode.config.update LinodeID=$LINODE_ID ConfigID=$CONFIG_ID Label="CoreOS" \
-      DiskList=$DISK_ID,$STORAGE_DISK_ID KernelID=213 RootDeviceNum=1 >/dev/null
+      DiskList=$DISK_ID,$(join STORAGE_DISK_IDS ",") KernelID=213 RootDeviceNum=1
 }
 
 transfer_acme() {
@@ -268,6 +268,20 @@ change_to_unprovisioned() {
   linode_api linode.update LinodeID=$LINODE_ID Label="${NODE_TYPE}_${LINODE_ID}" lpm_displayGroup="$DOMAIN"
 }
 
+validate_disk_sizes() {
+  local sizes=($(echo $1 | sed "s/,/ /g"))
+  local total_size=0
+  for disk_size in ${sizes[@]}; do
+    total_size=$(($total_size+$disk_size))
+  done
+
+  if [ $total_size -le $TOTAL_DISK_SIZE ]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 install() {
     local NODE_TYPE
     local LINODE_ID
@@ -284,15 +298,32 @@ install() {
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving maximum available disk size" "get_max_disk_size $PLAN" TOTAL_DISK_SIZE
 
     INSTALL_DISK_SIZE=1024
-    STORAGE_DISK_SIZE=10240
-    COREOS_OLD_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
-    COREOS_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
+    STORAGE_DISK_SIZE=0
+
     #"CoreOS disk size: ${COREOS_DISK_SIZE}mb" $LINODE_ID
     #"Storage disk size: ${STORAGE_DISK_SIZE}mb" $LINODE_ID
     #"Install disk size: ${INSTALL_DISK_SIZE}mb" $LINODE_ID
     #"Total disk size: ${TOTAL_DISK_SIZE}mb" $LINODE_ID
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating storage disk" "create_ext4_disk $LINODE_ID $STORAGE_DISK_SIZE Storage" STORAGE_DISK_ID
+    tput el
+    text_input "Key in your local storage size (comma separated in mb, total not exceeding ${TOTAL_DISK_SIZE}mb):" \
+           DISK_SIZES "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
+    stty -echo
+    tput civis
+    tput cuu1
+    tput el
+    tput el1
+
+    DISK_SIZES=($(echo $DISK_SIZES | sed "s/,/ /g"))
+    STORAGE_DISK_IDS=()
+    for DISK_SIZE in ${DISK_SIZES[@]}; do
+      spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${disk_size}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
+      STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
+      STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
+    done
+
+    COREOS_OLD_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
+    COREOS_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
 
@@ -565,7 +596,7 @@ update_dns() {
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
   fi
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address id" get_ip_address_id IP_ADDRESS_ID
+  spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address ID" get_ip_address_id IP_ADDRESS_ID
 
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating reverse DNS record of $IP to $DOMAIN" \
           "linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname=\'$DOMAIN\'"
