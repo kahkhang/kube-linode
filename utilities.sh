@@ -312,11 +312,7 @@ install() {
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
-<<<<<<< HEAD
               "k8s_ver": "v1.7.0_coreos.0",
-=======
-              "k8s_ver": "v1.7.0-rc.1_coreos.0",
->>>>>>> 52a7afe21a61f549248bc9ded4c90838e8c44e48
               "dns_service_ip": "10.3.0.10",
               "k8s_service_ip": "10.3.0.1",
               "service_ip_range": "10.3.0.0/24",
@@ -344,11 +340,7 @@ EOF
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
-<<<<<<< HEAD
               "k8s_ver": "v1.7.0_coreos.0",
-=======
-              "k8s_ver": "v1.7.0-rc.1_coreos.0",
->>>>>>> 52a7afe21a61f549248bc9ded4c90838e8c44e48
               "dns_service_ip": "10.3.0.10",
               "k8s_service_ip": "10.3.0.1",
               "service_ip_range": "10.3.0.0/24",
