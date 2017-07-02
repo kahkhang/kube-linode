@@ -31,15 +31,12 @@ Settings are stored in `~/.kube-linode/settings.env`.
 
 To increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `kube-linode` again.
 
-### Requirements
+### Dependencies
 You have a Linode Account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
 
-To install using OSX's [homebrew](https://brew.sh/):
-```sh
-brew install jq openssl curl kubectl
-```
+OSX's [homebrew](https://brew.sh/): ``` brew install jq openssl curl kubectl ```
 
-This script has been tested to be working on OSX and Arch Linux.
+Arch Linux: Follow the instructions [here](https://github.com/kahkhang/kube-linode/issues/4#issuecomment-311601422)
 
 ### Acknowledgements
 This source code was based on APIC-NET's [k8s-cluster](https://github.com/APNIC-net/linode-k8s-cluster), using a
