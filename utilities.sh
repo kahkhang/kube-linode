@@ -317,7 +317,7 @@ install() {
     DISK_SIZES=($(echo $DISK_SIZES | sed "s/,/ /g"))
     STORAGE_DISK_IDS=()
     for DISK_SIZE in ${DISK_SIZES[@]}; do
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${disk_size}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
+      spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
       STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
       STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
     done
