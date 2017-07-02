@@ -1,4 +1,4 @@
-## Provision a Kubernetes / CoreOS Cluster on Linode
+## Provision a Kubernetes / CoreOS Cluster on Linode  [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/kahkhang/kube-linode/master/LICENSE) [![GitHub issues](https://img.shields.io/github/issues/kahkhang/kube-linode.svg)](https://github.com/kahkhang/kube-linode/issues) [![Twitter](https://img.shields.io/twitter/url/https/github.com/kahkhang/kube-linode.svg?style=social)](https://twitter.com/intent/tweet?text=Wow:&url=%5Bobject%20Object%5D)
 
 Automatically provisions a scalable CoreOS/Kubernetes cluster on Linode, comprising of a single schedulable Kubernetes master host with a custom number of worker nodes.
 
