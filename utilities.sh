@@ -440,23 +440,41 @@ update_script() {
 }
 
 read_api_key() {
+  local result=false
   if ! [[ $API_KEY =~ ^[0-9a-zA-Z]+$ ]] 2>/dev/null; then
       while ! [[ $API_KEY =~ ^-?[0-9a-zA-Z]+$ ]] 2>/dev/null; do
          text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
+         tput civis
       done
-      while ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; do
+      while true ; do
+         spinner "Verifying API Key" check_api_key result
+         if [ $result = true ] ; then
+           break
+         fi
          text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
+         tput civis
       done
-      echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
   else
-      if ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; then
-        while ! linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; do
-           text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
-        done
-        echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
-      fi
+      while true ; do
+         spinner "Verifying API Key" check_api_key result
+         if [ $result = true ] ; then
+           break
+         fi
+         text_input "Enter Linode API Key (https://manager.linode.com/profile/api) : " API_KEY
+         tput civis
+      done
   fi
-  tput civis
+   sed -i.bak '/^API_KEY/d' ~/.kube-linode/settings.env
+   echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
+   rm ~/.kube-linode/settings.env.bak
+}
+
+check_api_key() {
+  if linode_api test.echo | jq -e ".ERRORARRAY == []" >/dev/null; then
+    echo true
+  else
+    echo false
+  fi
 }
 
 get_plans() {
