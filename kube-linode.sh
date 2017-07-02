@@ -100,7 +100,7 @@ fi
 tput el
 echo "${CYAN}[$MASTER_ID]${NORMAL} Master provisioned (IP: $MASTER_IP)"
 
-spinner "${CYAN}[$MASTER_ID]${NORMAL} current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
+spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
 NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
 
 if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
