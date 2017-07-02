@@ -22,10 +22,7 @@ To install the script:
 curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh | bash
 ```
 
-Just type `kube-linode` into your console, and have a :coffee:!
-```sh
-kube-linode
-```
+Just run `kube-linode` into your console, key in your configuration, then sit back and have a :coffee:!
 
 Settings are stored in `~/.kube-linode/settings.env`.
 
