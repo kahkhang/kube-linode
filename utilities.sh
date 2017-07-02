@@ -20,7 +20,7 @@ fi
 set -e
 
 control_c() {
-  tput el1
+  tput cub "$(tput cols)"
   tput el
   stty sane
   tput cnorm

@@ -91,6 +91,9 @@ gen_index() {
 }
 
 control_c() {
+  tput cub "$(tput cols)"
+  tput el
+  stty sane
   tput cnorm
   stty echo
   exit $?
