@@ -1,10 +1,11 @@
-## Provision a Kubernetes / CoreOS Cluster on Linode  [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/kahkhang/kube-linode/master/LICENSE) [![Twitter](https://img.shields.io/twitter/url/https/github.com/kahkhang/kube-linode.svg?style=social)](https://twitter.com/intent/tweet?text=Wow:&url=%5Bobject%20Object%5D)
+## :whale: Provision a Kubernetes / CoreOS Cluster on Linode
+[![Bash](https://img.shields.io/badge/language-Bash-green.svg)](https://github.com/kahkhang/kube-linode) [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/kahkhang/kube-linode/master/LICENSE) [![Twitter](https://img.shields.io/twitter/url/https/github.com/kahkhang/kube-linode.svg?style=social)](https://twitter.com/intent/tweet?text=%23kube-linode%20rocks%21&url=%5Bobject%20Object%5D)
 
-Automatically provisions a scalable CoreOS/Kubernetes cluster on Linode, comprising of a single schedulable Kubernetes master host with a custom number of worker nodes.
-
-There is zero configuration needed (all you need is an API Key with a valid domain that uses [Linode's DNS servers](https://www.linode.com/docs/networking/dns/dns-manager-overview#set-domain-names-to-use-linodes-name-servers))
+Automatically provision a scalable CoreOS/Kubernetes cluster on Linode with zero configuration. All you need is an API Key with a valid domain that uses [Linode's DNS servers](https://www.linode.com/docs/networking/dns/dns-manager-overview#set-domain-names-to-use-linodes-name-servers).
 
 ![Demo](demo.gif)
+
+The cluster will comprise of a single schedulable Kubernetes master host with a custom number of worker nodes.
 
 ### What's included
 * Load Balancer and automatic SSL/TLS renewal using [Traefik](https://github.com/containous/traefik)
@@ -22,10 +23,7 @@ To install the script:
 curl -s https://raw.githubusercontent.com/kahkhang/kube-linode/master/install.sh | bash
 ```
 
-Just type `kube-linode` into your console, and have a :coffee:!
-```sh
-kube-linode
-```
+Just run `kube-linode` into your console, key in your configuration, then sit back and have a :coffee:!
 
 Settings are stored in `~/.kube-linode/settings.env`.
 
