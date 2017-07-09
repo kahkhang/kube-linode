@@ -307,14 +307,14 @@ install() {
 
     tput el
     text_input "Key in your local storage size (comma separated in mb, total not exceeding ${TOTAL_DISK_SIZE}mb):" \
-           DISK_SIZES "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
+           DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
     stty -echo
     tput civis
     tput cuu1
     tput el
     tput el1
 
-    DISK_SIZES=($(echo $DISK_SIZES | sed "s/,/ /g"))
+    DISK_SIZES=($(echo $DISK_SIZES_INPUT | sed "s/,/ /g"))
     STORAGE_DISK_IDS=()
     for DISK_SIZE in ${DISK_SIZES[@]}; do
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
