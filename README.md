@@ -30,7 +30,7 @@ Settings are stored in `~/.kube-linode/settings.env`.
 To increase the number of workers, simply modify `NO_OF_WORKERS` in `settings.env` to your desired worker count, then run `kube-linode` again.
 
 ### Dependencies
-You have a Linode Account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
+You should have a Linode Account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
 
 OSX's [homebrew](https://brew.sh/): ``` brew install jq openssl curl kubectl ```
 
