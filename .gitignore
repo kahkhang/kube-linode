@@ -1,4 +1,5 @@
 certs/
+cluster/
 acme.json
 auth
 settings.env
@@ -7,3 +8,5 @@ package.sh
 *.yaml
 *.zip
 demo.mov
+resolv.conf
+bootkube

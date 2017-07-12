@@ -132,12 +132,22 @@ reset_linode() {
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for all jobs to complete" "wait_jobs $LINODE_ID"
 }
 
-get_ip() {
+get_public_ip() {
   local LINODE_ID=$1
   local IP
-  eval IP=\$IP_$LINODE_ID
+  eval IP=\$PUBLIC_$LINODE_ID
   if ! [[ $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] 2>/dev/null; then
       IP="$( linode_api linode.ip.list LinodeID=$LINODE_ID | jq -Mje '.DATA[] | select(.ISPUBLIC==1) | .IPADDRESS' | sed -n 1p )"
+  fi
+  echo $IP
+}
+
+get_private_ip() {
+  local LINODE_ID=$1
+  local IP
+  eval IP=\$PRIVATE_$LINODE_ID
+  if ! [[ $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] 2>/dev/null; then
+      IP="$( linode_api linode.ip.list LinodeID=$LINODE_ID | jq -Mje '.DATA[] | select(.ISPUBLIC==0) | .IPADDRESS' | sed -n 1p )"
   fi
   echo $IP
 }
@@ -242,7 +252,7 @@ boot_linode() {
 
 update_coreos_config() {
   linode_api linode.config.update LinodeID=$LINODE_ID ConfigID=$CONFIG_ID Label="CoreOS" \
-      DiskList=$DISK_ID,$(join STORAGE_DISK_IDS ",") KernelID=213 RootDeviceNum=1
+      DiskList=$DISK_ID,$(join STORAGE_DISK_IDS ",") KernelID=213 RootDeviceNum=1 helper_network=false
 }
 
 transfer_acme() {
@@ -327,7 +337,8 @@ install() {
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
 
-    eval IP=\$IP_$LINODE_ID
+    eval IP=\$PUBLIC_$LINODE_ID
+    eval PRIVATE_IP=\$PRIVATE_$LINODE_ID
     if [ "$NODE_TYPE" = "master" ] ; then
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Generating master certificates" "gen_master_certs $IP $LINODE_ID"
         PARAMS=$( cat <<-EOF
@@ -342,6 +353,8 @@ install() {
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
+              "PUBLIC_IP": "$IP",
+              "PRIVATE_IP": "$PRIVATE_IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
               "k8s_ver": "v1.7.0_coreos.0",
               "dns_service_ip": "10.3.0.10",
@@ -370,6 +383,8 @@ EOF
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
+              "PUBLIC_IP": "$IP",
+              "PRIVATE_IP": "$PRIVATE_IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
               "k8s_ver": "v1.7.0_coreos.0",
               "dns_service_ip": "10.3.0.10",
@@ -415,16 +430,16 @@ EOF
         fi
     fi
 
-    tput el
-
-    ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
-            "./bootstrap.sh" 2>/dev/null
-
-    tput el
+    provision_master $IP
+    #spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" "provision_master $IP"
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting bootstrap script" delete_bootstrap_script
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+}
+
+provision_master() {
+  REMOTE_USER=${USERNAME} SELF_HOST_ETCD=true $DIR/init-master.sh $1
 }
 
 update_script() {
@@ -596,7 +611,7 @@ update_dns() {
   local IP
   local IP_ADDRESS_ID
   local RESOURCE_IDS
-  eval IP=\$IP_$LINODE_ID
+  eval IP=\$PUBLIC_$LINODE_ID
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
   if ! [[ $DOMAIN_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating DNS record for $DOMAIN" create_domain
@@ -614,10 +629,10 @@ update_dns() {
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
   fi
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address ID" get_ip_address_id IP_ADDRESS_ID
+  # spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address ID" get_ip_address_id IP_ADDRESS_ID
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating reverse DNS record of $IP to $DOMAIN" \
-          "linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname=\'$DOMAIN\'"
+  # spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating reverse DNS record of $IP to $DOMAIN" \
+  #         "linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname=\'$DOMAIN\'"
 }
 
 read_no_of_workers() {
@@ -634,6 +649,11 @@ create_linode() {
   DATACENTER_ID=$1
   PLAN_ID=$2
   linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$PLAN_ID | jq ".DATA.LinodeID"
+}
+
+add_private_ip() {
+  local LINODE_ID=$1
+  linode_api linode.ip.addprivate LinodeID=$LINODE_ID
 }
 
 set_kubectl_defaults() {
