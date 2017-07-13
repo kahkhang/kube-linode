@@ -430,10 +430,21 @@ EOF
         fi
     fi
 
-    provision_master $IP
+    tput el
+
+    ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
+            "sudo ./bootstrap.sh" 2>/dev/null
+
+    if [ "$NODE_TYPE" = "master" ] ; then
+        mkdir cluster
+        scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
+
+        ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
+    fi
+
     #spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" "provision_master $IP"
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting bootstrap script" delete_bootstrap_script
+    #spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting bootstrap script" delete_bootstrap_script
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
 }
