@@ -22,7 +22,15 @@ cat > container-linux-config.json <<-EOF
       }
     ]
   },
-  "systemd": {},
+  "systemd": {
+    "units": [
+      {
+        "name": "localstorage.service",
+        "enable": true,
+        "contents": "[Unit]\nDescription=command\n[Service]\nType=oneshot\nRemainAfterExit=true\nExecStart=/bin/sh -c 'for disk in \$( ls /dev -1 | grep '^sd[bcdefgh]\$'); do mkdir -p /mnt/disks/\$disk; mount /dev/\$disk /mnt/disks/\$disk; echo Mounted disk \$disk; done'\n"
+      }
+    ]
+  },
   "networkd": {
     "units": [
       {
