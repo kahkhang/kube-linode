@@ -422,35 +422,25 @@ EOF
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 30"
+    spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
     if [ "$NODE_TYPE" = "master" ] ; then
         if [ -e ~/.kube-linode/acme.json ] ; then
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" provision_master
     fi
-
-    tput el
-
-    ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
-            "sudo ./bootstrap.sh" 2>/dev/null
-
-    if [ "$NODE_TYPE" = "master" ] ; then
-        mkdir cluster
-        scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
-
-        ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
-    fi
-
-    #spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" "provision_master $IP"
-
-    #spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting bootstrap script" delete_bootstrap_script
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
 }
 
 provision_master() {
-  REMOTE_USER=${USERNAME} SELF_HOST_ETCD=true $DIR/init-master.sh $1
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
+          "sudo ./bootstrap.sh" 2>/dev/null
+  [ -e $DIR/cluster ] && rm -rf $DIR/cluster
+  mkdir $DIR/cluster
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
 }
 
 update_script() {
