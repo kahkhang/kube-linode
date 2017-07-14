@@ -113,7 +113,7 @@ reset_linode() {
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting status" "get_status $LINODE_ID" STATUS
 
-    if [ $STATUS = 1 ]; then
+    if [ "$STATUS" = "1" ]; then
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Shutting down linode" "shutdown $LINODE_ID"
     fi
 
