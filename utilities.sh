@@ -265,11 +265,12 @@ change_to_provisioned() {
 change_to_unprovisioned() {
   local LINODE_ID=$1
   local NODE_TYPE=$2
-  linode_api linode.update LinodeID=$LINODE_ID Label="${NODE_TYPE}_${LINODE_ID}" lpm_displayGroup="$DOMAIN"
+  linode_api linode.update LinodeID=$LINODE_ID Label="${NODE_TYPE}_${LINODE_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)"
 }
 
 validate_disk_sizes() {
-  local sizes=($(echo $1 | sed "s/,/ /g"))
+  IFS=$'\n'
+  local sizes=($(echo $1 | tr ',' '\n'))
   local total_size=0
   for disk_size in ${sizes[@]}; do
     total_size=$(($total_size+$disk_size))
@@ -314,7 +315,8 @@ install() {
     tput el
     tput el1
 
-    DISK_SIZES=($(echo $DISK_SIZES_INPUT | sed "s/,/ /g"))
+    IFS=$'\n'
+    DISK_SIZES=($(echo $DISK_SIZES_INPUT | tr ',' '\n'))
     STORAGE_DISK_IDS=()
     for DISK_SIZE in ${DISK_SIZES[@]}; do
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
