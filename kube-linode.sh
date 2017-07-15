@@ -24,6 +24,7 @@ check_dep openssl
 check_dep awk
 check_dep sed
 check_dep cat
+check_dep tr
 
 unset DATACENTER_ID
 unset MASTER_PLAN
@@ -111,7 +112,6 @@ if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
     for WORKER in $( seq $NO_OF_NEW_WORKERS ); do
         spinner "Creating worker linode" "create_linode $DATACENTER_ID $WORKER_PLAN" WORKER_ID
         spinner "Adding private IP" "add_private_ip $WORKER_ID"
-        linode_api linode.update LinodeID=$WORKER_ID Label="worker_${WORKER_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)" >/dev/null
         spinner "Initializing labels" "change_to_unprovisioned $WORKER_ID worker"
     done
 fi
