@@ -99,7 +99,6 @@ spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving provision status" "is_provision
 if [ $IS_PROVISIONED = false ] ; then
   update_dns $MASTER_ID
   install master $MASTER_ID
-  spinner "${CYAN}[$MASTER_ID]${NORMAL} Setting defaults for kubectl" set_kubectl_defaults
 fi
 
 tput el

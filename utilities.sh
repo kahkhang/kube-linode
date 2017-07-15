@@ -603,13 +603,6 @@ add_private_ip() {
   linode_api linode.ip.addprivate LinodeID=$LINODE_ID
 }
 
-set_kubectl_defaults() {
-  kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=$HOME/.kube-linode/certs/ca.pem >/dev/null
-  kubectl config set-credentials ${USERNAME} --certificate-authority=$HOME/.kube-linode/certs/ca.pem --client-key=$HOME/.kube-linode/certs/admin-key.pem --client-certificate=$HOME/.kube-linode/certs/admin.pem >/dev/null
-  kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
-  kubectl config use-context default-context >/dev/null
-}
-
 get_no_of_workers() {
   echo "$( list_worker_ids | wc -l ) + 0" | bc
 }
