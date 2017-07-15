@@ -288,12 +288,6 @@ install() {
     if [ "$NODE_TYPE" = "master" ] ; then
         PARAMS=$( cat <<-EOF
           {
-              "admin_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin-key.pem )",
-              "admin_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin.pem )",
-              "apiserver_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/apiserver-key.pem )",
-              "apiserver_cert": "$( base64 $base64_args < ~/.kube-linode/certs/apiserver.pem )",
-              "ca_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca-key.pem )",
-              "ca_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
@@ -310,7 +304,6 @@ install() {
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 $base64_args < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -320,9 +313,6 @@ EOF
     if [ "$NODE_TYPE" = "worker" ] ; then
         PARAMS=$( cat <<-EOF
           {
-              "worker_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker-key.pem )",
-              "worker_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker.pem )",
-              "ca_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
@@ -339,7 +329,6 @@ EOF
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 $base64_args < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
