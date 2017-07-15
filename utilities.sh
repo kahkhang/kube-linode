@@ -152,62 +152,6 @@ get_private_ip() {
   echo $IP
 }
 
-gen_master_certs() {
-  MASTER_IP=$1
-  LINODE_ID=$2
-  mkdir -p ~/.kube-linode/certs >/dev/null
-  [ -e ~/.kube-linode/certs/openssl.cnf ] && rm ~/.kube-linode/certs/openssl.cnf >/dev/null
-  cat > ~/.kube-linode/certs/openssl.cnf <<-EOF
-    [req]
-    req_extensions = v3_req
-    distinguished_name = req_distinguished_name
-    [req_distinguished_name]
-    [ v3_req ]
-    basicConstraints = CA:FALSE
-    keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-    subjectAltName = @alt_names
-    [alt_names]
-    DNS.1 = kubernetes
-    DNS.2 = kubernetes.default
-    DNS.3 = kubernetes.default.svc
-    DNS.4 = kubernetes.default.svc.cluster.local
-    IP.1 = 10.3.0.1
-    IP.2 = $MASTER_IP
-EOF
-  openssl genrsa -out ~/.kube-linode/certs/ca-key.pem 2048 >/dev/null 2>&1
-  openssl req -x509 -new -nodes -key ~/.kube-linode/certs/ca-key.pem -days 10000 -out ~/.kube-linode/certs/ca.pem -subj "/CN=kube-ca" >/dev/null 2>&1
-  openssl genrsa -out ~/.kube-linode/certs/apiserver-key.pem 2048 >/dev/null 2>&1
-  openssl req -new -key ~/.kube-linode/certs/apiserver-key.pem -out ~/.kube-linode/certs/apiserver.csr -subj "/CN=kube-apiserver" -config ~/.kube-linode/certs/openssl.cnf >/dev/null 2>&1
-  openssl x509 -req -in ~/.kube-linode/certs/apiserver.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/apiserver.pem -days 365 -extensions v3_req -extfile ~/.kube-linode/certs/openssl.cnf >/dev/null 2>&1
-  openssl genrsa -out ~/.kube-linode/certs/admin-key.pem 2048 >/dev/null 2>&1
-  openssl req -new -key ~/.kube-linode/certs/admin-key.pem -out ~/.kube-linode/certs/admin.csr -subj "/CN=kube-admin" >/dev/null 2>&1
-  openssl x509 -req -in ~/.kube-linode/certs/admin.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/admin.pem -days 365 >/dev/null 2>&1
-}
-
-gen_worker_certs() {
-  WORKER_FQDN=$1
-  WORKER_IP=$1
-  LINODE_ID=$2
-  if [ -f ~/.kube-linode/certs/worker-openssl.cnf ] ; then : ; else
-      cat > ~/.kube-linode/certs/worker-openssl.cnf <<-EOF
-        [req]
-        req_extensions = v3_req
-        distinguished_name = req_distinguished_name
-        [req_distinguished_name]
-        [ v3_req ]
-        basicConstraints = CA:FALSE
-        keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-        subjectAltName = @alt_names
-        [alt_names]
-        IP.1 = \$ENV::WORKER_IP
-EOF
-  fi
-
-  openssl genrsa -out ~/.kube-linode/certs/${WORKER_FQDN}-worker-key.pem 2048 >/dev/null 2>&1
-  WORKER_IP=${WORKER_IP} openssl req -new -key ~/.kube-linode/certs/${WORKER_FQDN}-worker-key.pem -out ~/.kube-linode/certs/${WORKER_FQDN}-worker.csr -subj "/CN=${WORKER_FQDN}" -config ~/.kube-linode/certs/worker-openssl.cnf >/dev/null 2>&1
-  WORKER_IP=${WORKER_IP} openssl x509 -req -in ~/.kube-linode/certs/${WORKER_FQDN}-worker.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/${WORKER_FQDN}-worker.pem -days 365 -extensions v3_req -extfile ~/.kube-linode/certs/worker-openssl.cnf >/dev/null 2>&1
-}
-
 get_plan_id() {
   local LINODE_ID=$1
   linode_api linode.list LinodeID=$LINODE_ID | jq ".DATA[0].PLANID"
@@ -342,7 +286,6 @@ install() {
     eval IP=\$PUBLIC_$LINODE_ID
     eval PRIVATE_IP=\$PRIVATE_$LINODE_ID
     if [ "$NODE_TYPE" = "master" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Generating master certificates" "gen_master_certs $IP $LINODE_ID"
         PARAMS=$( cat <<-EOF
           {
               "admin_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin-key.pem )",
@@ -375,7 +318,6 @@ EOF
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Generating worker certificates" "gen_worker_certs $IP $LINODE_ID"
         PARAMS=$( cat <<-EOF
           {
               "worker_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker-key.pem )",
@@ -431,14 +373,6 @@ EOF
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" provision_master
-
-        mkdir -p $HOME/.kube && yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
-        kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
-
-        kubectl create -f $DIR/heapster.yaml
-        cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create -f -
-        kubectl create -f $DIR/local-storage.yaml
-        cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create -f -
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
@@ -457,6 +391,13 @@ provision_master() {
   mkdir $DIR/cluster
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
+  mkdir -p $HOME/.kube && yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
+  kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
+
+  kubectl create -f $DIR/heapster.yaml --validate=false
+  cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
+  kubectl create -f $DIR/local-storage.yaml --validate=false
+  cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
 }
 
 update_script() {

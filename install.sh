@@ -9,13 +9,18 @@ echo -ne '                          (0%)\r'
 [ -e ~/.kube-linode/ora.sh ] && rm ~/.kube-linode/ora.sh
 
 echo -ne '#####                     (33%)\r'
-curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/install-coreos.sh > ~/.kube-linode/install-coreos.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/install-coreos.sh > ~/.kube-linode/install-coreos.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/heapster.yaml > ~/.kube-linode/heapster.yaml
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/kube-dashboard.yaml > ~/.kube-linode/kube-dashboard.yaml
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/local-storage.yaml > ~/.kube-linode/local-storage.yaml
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/traefik.yaml > ~/.kube-linode/traefik.yaml
+
 echo -ne '#############             (66%)\r'
-curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/kube-linode.sh > ~/.kube-linode/kube-linode.sh
-curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/inquirer.sh > ~/.kube-linode/inquirer.sh
-curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/ora.sh > ~/.kube-linode/ora.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/kube-linode.sh > ~/.kube-linode/kube-linode.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/inquirer.sh > ~/.kube-linode/inquirer.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/ora.sh > ~/.kube-linode/ora.sh
 echo -ne '####################      (90%)\r'
-curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/master/utilities.sh > ~/.kube-linode/utilities.sh
+curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/utilities.sh > ~/.kube-linode/utilities.sh
 
 chmod +x ~/.kube-linode/kube-linode.sh
 
