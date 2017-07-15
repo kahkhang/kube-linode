@@ -431,6 +431,14 @@ EOF
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" provision_master
+
+        mkdir -p $HOME/.kube && yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
+        kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
+
+        kubectl create -f $DIR/heapster.yaml
+        cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create -f -
+        kubectl create -f $DIR/local-storage.yaml
+        cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create -f -
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
