@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kubernetes-dashboard-v1.6.1
+  namespace: kube-system
+  labels:
+    k8s-app: kubernetes-dashboard
+    version: v1.6.1
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: kubernetes-dashboard
+  template:
+    metadata:
+      labels:
+        k8s-app: kubernetes-dashboard
+        version: v1.6.1
+        kubernetes.io/cluster-service: "true"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
+    spec:
+      containers:
+      - name: kubernetes-dashboard
+        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.6.1
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        ports:
+        - containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9090
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: dashboard-ingress
+  namespace: kube-system
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    ingress.kubernetes.io/auth-type: "basic"
+    ingress.kubernetes.io/auth-secret: "kubesecret"
+spec:
+  rules:
+    - host: kube.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: kubernetes-dashboard
+              servicePort: 80
+    - host: traefik.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: traefik-console
+              servicePort: webui
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubernetes-dashboard
+  namespace: kube-system
+  labels:
+    k8s-app: kubernetes-dashboard
+    kubernetes.io/cluster-service: "true"
+spec:
+  selector:
+    k8s-app: kubernetes-dashboard
+  ports:
+  - port: 80
+    targetPort: 9090

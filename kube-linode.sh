@@ -78,6 +78,7 @@ if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
    done
 
    spinner "Creating master linode" "create_linode $DATACENTER_ID $MASTER_PLAN" MASTER_ID
+   spinner "Adding private IP" "add_private_ip $MASTER_ID"
 
    spinner "${CYAN}[$MASTER_ID]${NORMAL} Initializing labels" \
            "linode_api linode.update LinodeID=$MASTER_ID Label=\"master_${MASTER_ID}\" lpm_displayGroup=\"$DOMAIN (Unprovisioned)\""
@@ -87,15 +88,17 @@ if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
    fi
 fi
 
-spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting IP" "get_ip $MASTER_ID" MASTER_IP
-declare "IP_$MASTER_ID=$MASTER_IP"
+spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting public IP" "get_public_ip $MASTER_ID" MASTER_IP
+declare "PUBLIC_$MASTER_ID=$MASTER_IP"
+
+spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting private IP" "get_private_ip $MASTER_ID" PRIVATE_IP
+declare "PRIVATE_$MASTER_ID=$PRIVATE_IP"
 
 spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving provision status" "is_provisioned $MASTER_ID" IS_PROVISIONED
 
 if [ $IS_PROVISIONED = false ] ; then
   update_dns $MASTER_ID
   install master $MASTER_ID
-  spinner "${CYAN}[$MASTER_ID]${NORMAL} Setting defaults for kubectl" set_kubectl_defaults
 fi
 
 tput el
@@ -107,6 +110,7 @@ NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
 if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
     for WORKER in $( seq $NO_OF_NEW_WORKERS ); do
         spinner "Creating worker linode" "create_linode $DATACENTER_ID $WORKER_PLAN" WORKER_ID
+        spinner "Adding private IP" "add_private_ip $WORKER_ID"
         spinner "Initializing labels" "change_to_unprovisioned $WORKER_ID worker"
     done
 fi
@@ -114,13 +118,17 @@ fi
 spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving list of workers" list_worker_ids WORKER_IDS
 
 for WORKER_ID in $WORKER_IDS; do
-   spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting IP" "get_ip $WORKER_ID" IP
-   declare "IP_$WORKER_ID=$IP"
+   spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting public IP" "get_public_ip $WORKER_ID" PUBLIC_IP
+   declare "PUBLIC_$WORKER_ID=$PUBLIC_IP"
+
+   spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting private IP" "get_private_ip $WORKER_ID" PRIVATE_IP
+   declare "PRIVATE_$WORKER_ID=$PRIVATE_IP"
+
    if [ "$( is_provisioned $WORKER_ID )" = false ] ; then
      install worker $WORKER_ID
    fi
    tput el
-   echo "${CYAN}[$WORKER_ID]${NORMAL} Worker provisioned (IP: $IP)"
+   echo "${CYAN}[$WORKER_ID]${NORMAL} Worker provisioned (IP: $PUBLIC_IP)"
 done
 
 wait

@@ -132,70 +132,24 @@ reset_linode() {
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for all jobs to complete" "wait_jobs $LINODE_ID"
 }
 
-get_ip() {
+get_public_ip() {
   local LINODE_ID=$1
   local IP
-  eval IP=\$IP_$LINODE_ID
+  eval IP=\$PUBLIC_$LINODE_ID
   if ! [[ $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] 2>/dev/null; then
       IP="$( linode_api linode.ip.list LinodeID=$LINODE_ID | jq -Mje '.DATA[] | select(.ISPUBLIC==1) | .IPADDRESS' | sed -n 1p )"
   fi
   echo $IP
 }
 
-gen_master_certs() {
-  MASTER_IP=$1
-  LINODE_ID=$2
-  mkdir -p ~/.kube-linode/certs >/dev/null
-  [ -e ~/.kube-linode/certs/openssl.cnf ] && rm ~/.kube-linode/certs/openssl.cnf >/dev/null
-  cat > ~/.kube-linode/certs/openssl.cnf <<-EOF
-    [req]
-    req_extensions = v3_req
-    distinguished_name = req_distinguished_name
-    [req_distinguished_name]
-    [ v3_req ]
-    basicConstraints = CA:FALSE
-    keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-    subjectAltName = @alt_names
-    [alt_names]
-    DNS.1 = kubernetes
-    DNS.2 = kubernetes.default
-    DNS.3 = kubernetes.default.svc
-    DNS.4 = kubernetes.default.svc.cluster.local
-    IP.1 = 10.3.0.1
-    IP.2 = $MASTER_IP
-EOF
-  openssl genrsa -out ~/.kube-linode/certs/ca-key.pem 2048 >/dev/null 2>&1
-  openssl req -x509 -new -nodes -key ~/.kube-linode/certs/ca-key.pem -days 10000 -out ~/.kube-linode/certs/ca.pem -subj "/CN=kube-ca" >/dev/null 2>&1
-  openssl genrsa -out ~/.kube-linode/certs/apiserver-key.pem 2048 >/dev/null 2>&1
-  openssl req -new -key ~/.kube-linode/certs/apiserver-key.pem -out ~/.kube-linode/certs/apiserver.csr -subj "/CN=kube-apiserver" -config ~/.kube-linode/certs/openssl.cnf >/dev/null 2>&1
-  openssl x509 -req -in ~/.kube-linode/certs/apiserver.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/apiserver.pem -days 365 -extensions v3_req -extfile ~/.kube-linode/certs/openssl.cnf >/dev/null 2>&1
-  openssl genrsa -out ~/.kube-linode/certs/admin-key.pem 2048 >/dev/null 2>&1
-  openssl req -new -key ~/.kube-linode/certs/admin-key.pem -out ~/.kube-linode/certs/admin.csr -subj "/CN=kube-admin" >/dev/null 2>&1
-  openssl x509 -req -in ~/.kube-linode/certs/admin.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/admin.pem -days 365 >/dev/null 2>&1
-}
-
-gen_worker_certs() {
-  WORKER_FQDN=$1
-  WORKER_IP=$1
-  LINODE_ID=$2
-  if [ -f ~/.kube-linode/certs/worker-openssl.cnf ] ; then : ; else
-      cat > ~/.kube-linode/certs/worker-openssl.cnf <<-EOF
-        [req]
-        req_extensions = v3_req
-        distinguished_name = req_distinguished_name
-        [req_distinguished_name]
-        [ v3_req ]
-        basicConstraints = CA:FALSE
-        keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-        subjectAltName = @alt_names
-        [alt_names]
-        IP.1 = \$ENV::WORKER_IP
-EOF
+get_private_ip() {
+  local LINODE_ID=$1
+  local IP
+  eval IP=\$PRIVATE_$LINODE_ID
+  if ! [[ $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] 2>/dev/null; then
+      IP="$( linode_api linode.ip.list LinodeID=$LINODE_ID | jq -Mje '.DATA[] | select(.ISPUBLIC==0) | .IPADDRESS' | sed -n 1p )"
   fi
-
-  openssl genrsa -out ~/.kube-linode/certs/${WORKER_FQDN}-worker-key.pem 2048 >/dev/null 2>&1
-  WORKER_IP=${WORKER_IP} openssl req -new -key ~/.kube-linode/certs/${WORKER_FQDN}-worker-key.pem -out ~/.kube-linode/certs/${WORKER_FQDN}-worker.csr -subj "/CN=${WORKER_FQDN}" -config ~/.kube-linode/certs/worker-openssl.cnf >/dev/null 2>&1
-  WORKER_IP=${WORKER_IP} openssl x509 -req -in ~/.kube-linode/certs/${WORKER_FQDN}-worker.csr -CA ~/.kube-linode/certs/ca.pem -CAkey ~/.kube-linode/certs/ca-key.pem -CAcreateserial -out ~/.kube-linode/certs/${WORKER_FQDN}-worker.pem -days 365 -extensions v3_req -extfile ~/.kube-linode/certs/worker-openssl.cnf >/dev/null 2>&1
+  echo $IP
 }
 
 get_plan_id() {
@@ -242,7 +196,7 @@ boot_linode() {
 
 update_coreos_config() {
   linode_api linode.config.update LinodeID=$LINODE_ID ConfigID=$CONFIG_ID Label="CoreOS" \
-      DiskList=$DISK_ID,$(join STORAGE_DISK_IDS ",") KernelID=213 RootDeviceNum=1
+      DiskList=$DISK_ID,$(join STORAGE_DISK_IDS ",") KernelID=213 RootDeviceNum=1 helper_network=false
 }
 
 transfer_acme() {
@@ -329,21 +283,17 @@ install() {
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
 
-    eval IP=\$IP_$LINODE_ID
+    eval IP=\$PUBLIC_$LINODE_ID
+    eval PRIVATE_IP=\$PRIVATE_$LINODE_ID
     if [ "$NODE_TYPE" = "master" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Generating master certificates" "gen_master_certs $IP $LINODE_ID"
         PARAMS=$( cat <<-EOF
           {
-              "admin_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin-key.pem )",
-              "admin_cert": "$( base64 $base64_args < ~/.kube-linode/certs/admin.pem )",
-              "apiserver_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/apiserver-key.pem )",
-              "apiserver_cert": "$( base64 $base64_args < ~/.kube-linode/certs/apiserver.pem )",
-              "ca_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca-key.pem )",
-              "ca_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
+              "PUBLIC_IP": "$IP",
+              "PRIVATE_IP": "$PRIVATE_IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
               "k8s_ver": "v1.7.0_coreos.0",
               "dns_service_ip": "10.3.0.10",
@@ -354,7 +304,6 @@ install() {
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 $base64_args < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -362,16 +311,14 @@ EOF
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Generating worker certificates" "gen_worker_certs $IP $LINODE_ID"
         PARAMS=$( cat <<-EOF
           {
-              "worker_key_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker-key.pem )",
-              "worker_cert": "$( base64 $base64_args < ~/.kube-linode/certs/${IP}-worker.pem )",
-              "ca_cert": "$( base64 $base64_args < ~/.kube-linode/certs/ca.pem )",
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "ip": "$IP",
               "node_type": "$NODE_TYPE",
               "advertise_ip": "$IP",
+              "PUBLIC_IP": "$IP",
+              "PRIVATE_IP": "$PRIVATE_IP",
               "etcd_endpoint" : "http://${MASTER_IP}:2379",
               "k8s_ver": "v1.7.0_coreos.0",
               "dns_service_ip": "10.3.0.10",
@@ -382,7 +329,6 @@ EOF
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
               "MASTER_IP" : "$MASTER_IP",
-              "AUTH" : "$( base64 $base64_args < ~/.kube-linode/auth )",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -409,24 +355,44 @@ EOF
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 30"
+    spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
     if [ "$NODE_TYPE" = "master" ] ; then
         if [ -e ~/.kube-linode/acme.json ] ; then
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" provision_master
     fi
 
-    tput el
-
-    ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
-            "./bootstrap.sh" 2>/dev/null
-
-    tput el
-
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting bootstrap script" delete_bootstrap_script
+    if [ "$NODE_TYPE" = "worker" ] ; then
+        scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig
+        ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null
+        ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh"
+    fi
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+}
+
+provision_master() {
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
+          "sudo ./bootstrap.sh" 2>/dev/null
+  [ -e $DIR/cluster ] && rm -rf $DIR/cluster
+  mkdir $DIR/cluster
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
+
+  mkdir -p $HOME/.kube
+  if [ -e $HOME/.kube/config ]; then
+    yes | cp $HOME/.kube/config $HOME/.kube/config.bak
+  fi
+
+  yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
+  kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
+
+  kubectl create -f $DIR/heapster.yaml --validate=false
+  cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
+  kubectl create -f $DIR/local-storage.yaml --validate=false
+  cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
 }
 
 update_script() {
@@ -598,7 +564,7 @@ update_dns() {
   local IP
   local IP_ADDRESS_ID
   local RESOURCE_IDS
-  eval IP=\$IP_$LINODE_ID
+  eval IP=\$PUBLIC_$LINODE_ID
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
   if ! [[ $DOMAIN_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating DNS record for $DOMAIN" create_domain
@@ -616,10 +582,10 @@ update_dns() {
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
   fi
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address ID" get_ip_address_id IP_ADDRESS_ID
+  # spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address ID" get_ip_address_id IP_ADDRESS_ID
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating reverse DNS record of $IP to $DOMAIN" \
-          "linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname=\'$DOMAIN\'"
+  # spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating reverse DNS record of $IP to $DOMAIN" \
+  #         "linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname=\'$DOMAIN\'"
 }
 
 read_no_of_workers() {
@@ -638,11 +604,9 @@ create_linode() {
   linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$PLAN_ID | jq ".DATA.LinodeID"
 }
 
-set_kubectl_defaults() {
-  kubectl config set-cluster ${USERNAME}-cluster --server=https://${MASTER_IP}:6443 --certificate-authority=$HOME/.kube-linode/certs/ca.pem >/dev/null
-  kubectl config set-credentials ${USERNAME} --certificate-authority=$HOME/.kube-linode/certs/ca.pem --client-key=$HOME/.kube-linode/certs/admin-key.pem --client-certificate=$HOME/.kube-linode/certs/admin.pem >/dev/null
-  kubectl config set-context default-context --cluster=${USERNAME}-cluster --user=${USERNAME} >/dev/null
-  kubectl config use-context default-context >/dev/null
+add_private_ip() {
+  local LINODE_ID=$1
+  linode_api linode.ip.addprivate LinodeID=$LINODE_ID
 }
 
 get_no_of_workers() {
