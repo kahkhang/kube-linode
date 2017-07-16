@@ -37,5 +37,4 @@ OSX's [homebrew](https://brew.sh/): ``` brew install jq openssl curl kubectl ```
 Arch Linux: Follow the instructions [here](https://github.com/kahkhang/kube-linode/issues/4#issuecomment-311601422)
 
 ### Acknowledgements
-This source code was based on APIC-NET's [k8s-cluster](https://github.com/APNIC-net/linode-k8s-cluster), using a
-modified version of [CoreOS](https://coreos.com/kubernetes/docs/latest/getting-started.html)'s manual installation instructions and [Linode's API](https://www.linode.com/api).
+This script uses [Bootkube](https://github.com/kubernetes-incubator/bootkube) to bootstrap the initial cluster using [Linode's API](https://www.linode.com/api).
