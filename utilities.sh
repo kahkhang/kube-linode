@@ -61,8 +61,10 @@ wait_jobs() {
 wait_boot() {
     LINODE_ID=$1
     while true ; do
-        if ( linode_api linode.job.list LinodeID=$LINODE_ID | jq ".DATA" | grep "Lassie initiated boot: CoreOS" >/dev/null ) ; then
-            break
+        if [[ $(linode_api linode.job.list LinodeID=$LINODE_ID | jq ".DATA" | \
+        	        jq -c "[ .[] | select(.LABEL == \"Lassie initiated boot: CoreOS\") | select(.HOST_SUCCESS == 1)]" | \
+        	        jq ".[] | .JOBID") =~ ^[0-9]+ ]]; then
+        		break
         fi
         sleep 3
     done
