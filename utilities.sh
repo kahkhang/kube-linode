@@ -353,13 +353,19 @@ EOF
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
+        if kubectl get nodes | grep --quiet "$IP"; then
+          spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+        else
+          tput el
+          echo "${CYAN}[$LINODE_ID]${NORMAL} Master node is uncontactable! Please run kube-linode again to re-provision."
+          exit 1
+        fi
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node (might take a while)" provision_worker
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
     fi
-
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
 }
 
 provision_master() {
