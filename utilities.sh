@@ -380,7 +380,13 @@ provision_master() {
   mkdir $DIR/cluster
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
-  mkdir -p $HOME/.kube && yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
+
+  mkdir -p $HOME/.kube
+  if [ -e $HOME/.kube/config ]; then
+    yes | cp $HOME/.kube/config $HOME/.kube/config.bak
+  fi
+
+  yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
   kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
 
   kubectl create -f $DIR/heapster.yaml --validate=false
