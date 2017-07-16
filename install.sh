@@ -8,6 +8,11 @@ echo -ne '                          (0%)\r'
 [ -e ~/.kube-linode/inquirer.sh ] && rm ~/.kube-linode/inquirer.sh
 [ -e ~/.kube-linode/ora.sh ] && rm ~/.kube-linode/ora.sh
 
+[ -e ~/.kube-linode/heapster.yaml ] && rm ~/.kube-linode/heapster.yaml
+[ -e ~/.kube-linode/kube-dashboard.yaml ] && rm ~/.kube-linode/kube-dashboard.yaml
+[ -e ~/.kube-linode/local-storage.yaml ] && rm ~/.kube-linode/local-storage.yaml
+[ -e ~/.kube-linode/traefik.yaml ] && rm ~/.kube-linode/traefik.yaml
+
 echo -ne '#####                     (33%)\r'
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/install-coreos.sh > ~/.kube-linode/install-coreos.sh
 curl -s -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/kahkhang/kube-linode/bootkube/heapster.yaml > ~/.kube-linode/heapster.yaml
