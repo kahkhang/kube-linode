@@ -5,7 +5,7 @@ Automatically provision a scalable CoreOS/Kubernetes cluster on Linode with zero
 
 ![Demo](demo.gif)
 
-The cluster will comprise of a single schedulable Kubernetes master host with a custom number of worker nodes.
+The cluster will comprise of a single Kubernetes master host with a custom number of worker nodes.
 
 ### What's included
 * Load Balancer and automatic SSL/TLS renewal using [Traefik](https://github.com/containous/traefik)
