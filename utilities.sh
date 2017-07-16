@@ -365,9 +365,7 @@ EOF
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
-        scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig
-        ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null
-        ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh"
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node" provision_worker
     fi
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
@@ -393,6 +391,12 @@ provision_master() {
   cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
   kubectl create -f $DIR/local-storage.yaml --validate=false
   cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
+}
+
+provision_worker() {
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh"
 }
 
 update_script() {
