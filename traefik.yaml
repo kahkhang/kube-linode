@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kube-system
+  labels:
+    k8s-app: traefik-ingress-lb
+spec:
+  selector:
+    k8s-app: traefik-ingress-lb
+  ports:
+    - port: 80
+      name: http
+    - port: 443
+      name: https
+  externalIPs:
+    - ${MASTER_IP}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-console
+  namespace: kube-system
+  labels:
+    k8s-app: traefik-ingress-lb
+spec:
+  selector:
+    k8s-app: traefik-ingress-lb
+  ports:
+    - port: 8080
+      name: webui
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-conf
+  namespace: kube-system
+data:
+  traefik.toml: |
+    # traefik.toml
+    defaultEntryPoints = ["http","https"]
+    [entryPoints]
+      [entryPoints.http]
+      address = ":80"
+      [entryPoints.http.redirect]
+      entryPoint = "https"
+      [entryPoints.https]
+      address = ":443"
+      [entryPoints.https.tls]
+    [acme]
+    email = "$EMAIL"
+    storageFile = "/acme/acme.json"
+    entryPoint = "https"
+    onDemand = true
+    onHostRule = true
+    caServer = "https://acme-v01.api.letsencrypt.org/directory"
+    [[acme.domains]]
+    main = "${DOMAIN}"
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+  labels:
+    k8s-app: traefik-ingress-lb
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  template:
+    metadata:
+      labels:
+        k8s-app: traefik-ingress-lb
+        name: traefik-ingress-lb
+    spec:
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: config
+          configMap:
+            name: traefik-conf
+        - name: acme
+          hostPath:
+            path: /etc/traefik/acme/acme.json
+      containers:
+        - image: containous/traefik:experimental
+          name: traefik-ingress-lb
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: "/config"
+              name: "config"
+            - mountPath: "/acme/acme.json"
+              name: "acme"
+          ports:
+            - containerPort: 80
+              hostPort: 80
+            - containerPort: 443
+              hostPort: 443
+            - containerPort: 8080
+          args:
+            - --configfile=/config/traefik.toml
+            - --web
+            - --kubernetes
+            - --logLevel=DEBUG
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
