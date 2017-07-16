@@ -263,7 +263,7 @@ install() {
     #"Total disk size: ${TOTAL_DISK_SIZE}mb" $LINODE_ID
 
     tput el
-    text_input "Key in your local storage size (comma separated in mb, total not exceeding ${TOTAL_DISK_SIZE}mb):" \
+    text_input "Enter local storage size (comma separated in mb, total below ${TOTAL_DISK_SIZE}mb):" \
            DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
     stty -echo
     tput civis
@@ -275,9 +275,11 @@ install() {
     DISK_SIZES=($(echo $DISK_SIZES_INPUT | tr ',' '\n'))
     STORAGE_DISK_IDS=()
     for DISK_SIZE in ${DISK_SIZES[@]}; do
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
-      STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
-      STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
+      if [ "$DISK_SIZE" -gt "0" ]; then
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
+        STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
+        STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
+      fi
     done
 
     COREOS_OLD_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
@@ -342,32 +344,24 @@ EOF
 
     # Configure the installer to boot
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating boot configuration" create_boot_configuration CONFIG_ID
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting installer" "boot_linode $LINODE_ID $CONFIG_ID"
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating CoreOS config" update_coreos_config
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Installing CoreOS (might take a while)" "wait_boot $LINODE_ID"
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Shutting down CoreOS" "linode_api linode.shutdown LinodeID=$LINODE_ID"
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting install disk $INSTALL_DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$INSTALL_DISK_ID"
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Resizing CoreOS disk $DISK_ID" "linode_api linode.disk.resize LinodeID=$LINODE_ID DiskID=$DISK_ID Size=$COREOS_DISK_SIZE"
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
-
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
     if [ "$NODE_TYPE" = "master" ] ; then
         if [ -e ~/.kube-linode/acme.json ] ; then
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node" provision_master
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node" provision_worker
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node (might take a while)" provision_worker
     fi
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
@@ -580,7 +574,12 @@ update_dns() {
 
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving list of resources for $DOMAIN" "get_resources $DOMAIN_ID" RESOURCE_LIST
 
-  if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .TARGET == \"$IP\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
+  IFS=$'\n'
+  if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .TARGET == \"$IP\") | .RESOURCEID" | sed -n 1p) =~ ^[0-9]+$ ]] 2>/dev/null; then
+      RESOURCE_IDS=$(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .NAME == \"\") | .RESOURCEID")
+      for RESOURCE_ID in $RESOURCE_IDS; do
+          spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting 'A' DNS record $RESOURCE_ID" "linode_api domain.resource.delete DomainID=$DOMAIN_ID ResourceID=$RESOURCE_ID"
+      done
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding 'A' DNS record to $DOMAIN with target $IP" create_A_domain
   fi
 
