@@ -257,11 +257,6 @@ install() {
     INSTALL_DISK_SIZE=1024
     STORAGE_DISK_SIZE=0
 
-    #"CoreOS disk size: ${COREOS_DISK_SIZE}mb" $LINODE_ID
-    #"Storage disk size: ${STORAGE_DISK_SIZE}mb" $LINODE_ID
-    #"Install disk size: ${INSTALL_DISK_SIZE}mb" $LINODE_ID
-    #"Total disk size: ${TOTAL_DISK_SIZE}mb" $LINODE_ID
-
     tput el
     text_input "Enter local storage size (comma separated in mb, total below ${TOTAL_DISK_SIZE}mb):" \
            DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
@@ -586,11 +581,6 @@ update_dns() {
   if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"CNAME\" and .TARGET == \"$DOMAIN\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
   fi
-
-  # spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting IP Address ID" get_ip_address_id IP_ADDRESS_ID
-
-  # spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating reverse DNS record of $IP to $DOMAIN" \
-  #         "linode_api linode.ip.setrdns IPAddressID=$IP_ADDRESS_ID Hostname=\'$DOMAIN\'"
 }
 
 read_no_of_workers() {
