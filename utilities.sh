@@ -203,7 +203,7 @@ update_coreos_config() {
 
 transfer_acme() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
-  "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < ~/.kube-linode/acme.json )' \
+  "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < $DIR/acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
 }
 
@@ -349,7 +349,7 @@ EOF
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
     if [ "$NODE_TYPE" = "master" ] ; then
-        if [ -e ~/.kube-linode/acme.json ] ; then
+        if [ -e $DIR/acme.json ] ; then
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
@@ -400,10 +400,10 @@ update_script() {
   local SCRIPT_ID
   SCRIPT_ID=$( linode_api stackscript.list | jq ".DATA" | jq -c '.[] | select(.LABEL == "CoreOS_Kube_Cluster") | .STACKSCRIPTID' | sed -n 1p )
   if ! [[ $SCRIPT_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
-      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat ~/.kube-linode/install-coreos.sh )" \
+      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat $DIR/install-coreos.sh )" \
                   | jq ".DATA.StackScriptID" )
   else
-      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat ~/.kube-linode/install-coreos.sh )" >/dev/null
+      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat $DIR/install-coreos.sh )" >/dev/null
   fi
   echo $SCRIPT_ID
 }
@@ -433,9 +433,9 @@ read_api_key() {
          tput civis
       done
   fi
-   sed -i.bak '/^API_KEY/d' ~/.kube-linode/settings.env
-   echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
-   rm ~/.kube-linode/settings.env.bak
+   sed -i.bak '/^API_KEY/d' $DIR/settings.env
+   echo "API_KEY=$API_KEY" >> $DIR/settings.env
+   rm $DIR/settings.env.bak
 }
 
 check_api_key() {
@@ -462,7 +462,7 @@ read_master_plan() {
 
          MASTER_PLAN=${plan_ids[$selected_disk_id]}
       done
-      echo "MASTER_PLAN=$MASTER_PLAN" >> ~/.kube-linode/settings.env
+      echo "MASTER_PLAN=$MASTER_PLAN" >> $DIR/settings.env
   fi
 
 }
@@ -480,7 +480,7 @@ read_worker_plan() {
 
          WORKER_PLAN=${plan_ids[$selected_disk_id]}
       done
-      echo "WORKER_PLAN=$WORKER_PLAN" >> ~/.kube-linode/settings.env
+      echo "WORKER_PLAN=$WORKER_PLAN" >> $DIR/settings.env
   fi
 
 }
@@ -500,7 +500,7 @@ read_datacenter() {
          list_input_index "Select a datacenter" datacenters_list selected_data_center_index
          DATACENTER_ID=${datacenters_ids[$selected_data_center_index]}
       done
-      echo "DATACENTER_ID=$DATACENTER_ID" >> ~/.kube-linode/settings.env
+      echo "DATACENTER_ID=$DATACENTER_ID" >> $DIR/settings.env
   fi
 }
 
@@ -509,7 +509,7 @@ read_domain() {
       while ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; do
          text_input "Enter Domain Name: " DOMAIN "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$" "Please enter a valid domain name"
       done
-      echo "DOMAIN=$DOMAIN" >> ~/.kube-linode/settings.env
+      echo "DOMAIN=$DOMAIN" >> $DIR/settings.env
   fi
   tput civis
 }
@@ -520,7 +520,7 @@ read_email() {
       while ! [[ $EMAIL =~ $email_regex ]] 2>/dev/null; do
          text_input "Enter Email: " EMAIL "^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$" "Please enter a valid email"
       done
-      echo "EMAIL=$EMAIL" >> ~/.kube-linode/settings.env
+      echo "EMAIL=$EMAIL" >> $DIR/settings.env
   fi
   tput civis
 }
@@ -594,7 +594,7 @@ read_no_of_workers() {
       while ! [[ $NO_OF_WORKERS =~ ^[0-9]+$ ]] 2>/dev/null; do
          text_input "Enter number of workers: " NO_OF_WORKERS "^[0-9]+$" "Please enter a number"
       done
-      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> ~/.kube-linode/settings.env
+      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> $DIR/settings.env
   fi
   tput civis
 }
