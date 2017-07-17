@@ -32,7 +32,7 @@ storage:
 
           REMOTE_USER=${USERNAME}
           CLUSTER_DIR=${CLUSTER_DIR:-cluster}
-          SELF_HOST_ETCD=${SELF_HOST_ETCD:-true}
+          SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
           CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY:-false}
           CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
 
@@ -122,10 +122,14 @@ storage:
               exit 1
           }
 
+          mkdir -p /opt/bin
+          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd
+          chmod +x /opt/bin/rbd
+          /opt/bin/rbd
+
           wget -P /home/${REMOTE_USER} https://github.com/kahkhang/kube-linode/raw/bootkube/bootkube.tar.gz
           tar -xzvf /home/${REMOTE_USER}/bootkube.tar.gz -C /home/${REMOTE_USER}
           chmod +x /home/${REMOTE_USER}/bootkube
-          sudo systemctl start localstorage.service
           init_master_node
       mode: 0700
 networkd:
@@ -145,15 +149,6 @@ networkd:
         Address=${PRIVATE_IP}/17
 systemd:
   units:
-    - name: localstorage.service
-      enable: true
-      contents: |
-        [Unit]
-        Description=command
-        [Service]
-        Type=oneshot
-        RemainAfterExit=true
-        ExecStart=/bin/sh -c 'for disk in $( ls /dev -1 | grep '^sd[bcdefgh]$'); do mkdir -p /mnt/disks/$disk; mount /dev/$disk /mnt/disks/$disk; echo Mounted disk $disk; done'
     - name: kubelet.service
       enable: true
       contents: |
@@ -166,7 +161,8 @@ systemd:
         --volume opt-cni-bin,kind=host,source=/opt/cni/bin --mount volume=opt-cni-bin,target=/opt/cni/bin \
         --volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log \
         --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni \
-        --volume local-storage,kind=host,source=/mnt/disks --mount volume=local-storage,target=/mnt/disks"
+        --volume modprobe,kind=host,source=/usr/sbin/modprobe --mount volume=modprobe,target=/usr/sbin/modprobe \
+        --volume lib-modules,kind=host,source=/lib/modules --mount volume=lib-modules,target=/lib/modules"
         EnvironmentFile=/etc/environment
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /opt/cni/bin
@@ -193,12 +189,12 @@ systemd:
           --node-labels=node-role.kubernetes.io/master \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --register-with-taints=node-role.kubernetes.io/master=:NoSchedule \
-          --require-kubeconfig \
-          --feature-gates=PersistentLocalVolumes=true,AffinityInAnnotations=true
+          --require-kubeconfig
         ExecStop=-/usr/bin/rkt stop --uuid-file=/var/cache/kubelet-pod.uuid
         Restart=always
         RestartSec=5
 
         [Install]
         WantedBy=multi-user.target
-#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | jq
+#sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g'
+#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/%24%7BUSERNAME%7D/${USERNAME}/g' | jq
