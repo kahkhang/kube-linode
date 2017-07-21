@@ -288,21 +288,12 @@ install() {
         PARAMS=$( cat <<-EOF
           {
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
-              "ip": "$IP",
               "node_type": "$NODE_TYPE",
-              "advertise_ip": "$IP",
               "PUBLIC_IP": "$IP",
               "PRIVATE_IP": "$PRIVATE_IP",
-              "etcd_endpoint" : "http://${MASTER_IP}:2379",
-              "k8s_ver": "v1.7.0_coreos.0",
-              "dns_service_ip": "10.3.0.10",
-              "k8s_service_ip": "10.3.0.1",
-              "service_ip_range": "10.3.0.0/24",
-              "pod_network": "10.2.0.0/16",
               "USERNAME": "$USERNAME",
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
-              "MASTER_IP" : "$MASTER_IP",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -313,21 +304,12 @@ EOF
         PARAMS=$( cat <<-EOF
           {
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
-              "ip": "$IP",
               "node_type": "$NODE_TYPE",
-              "advertise_ip": "$IP",
               "PUBLIC_IP": "$IP",
               "PRIVATE_IP": "$PRIVATE_IP",
-              "etcd_endpoint" : "http://${MASTER_IP}:2379",
-              "k8s_ver": "v1.7.0_coreos.0",
-              "dns_service_ip": "10.3.0.10",
-              "k8s_service_ip": "10.3.0.1",
-              "service_ip_range": "10.3.0.0/24",
-              "pod_network": "10.2.0.0/16",
               "USERNAME": "$USERNAME",
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
-              "MASTER_IP" : "$MASTER_IP",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -353,6 +335,9 @@ EOF
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
+
+        #spinner "Waiting for kubectl" "sleep 30"
+
         if kubectl get nodes | grep --quiet "$IP"; then
           spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
         else
@@ -386,7 +371,6 @@ provision_master() {
 
   kubectl create -f $DIR/heapster.yaml --validate=false
   cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
-  kubectl create -f $DIR/local-storage.yaml --validate=false
   cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
 }
 
