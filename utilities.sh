@@ -257,27 +257,17 @@ install() {
     INSTALL_DISK_SIZE=1024
     STORAGE_DISK_SIZE=0
 
-    if [ "$NODE_TYPE" = "worker" ] ; then
-      tput el
-      text_input "Enter local storage size (comma separated in mb, total below ${TOTAL_DISK_SIZE}mb):" \
-             DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
-      stty -echo
-      tput civis
-      tput cuu1
-      tput el
-      tput el1
-    fi
-
     IFS=$'\n'
-    DISK_SIZES=($(echo $DISK_SIZES_INPUT | tr ',' '\n'))
-    STORAGE_DISK_IDS=()
-    for DISK_SIZE in ${DISK_SIZES[@]}; do
-      if [ "$DISK_SIZE" -gt "0" ]; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
-        STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
-        STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
-      fi
-    done
+
+    if [ "$NODE_TYPE" = "worker" ] ; then
+      DISK_SIZE="$(($TOTAL_DISK_SIZE-7168))"
+      spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
+      STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
+      STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
+    else
+      DISK_SIZE=0
+      STORAGE_DISK_IDS=()
+    fi
 
     COREOS_OLD_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
     COREOS_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
@@ -336,22 +326,22 @@ EOF
         if [ -e $DIR/acme.json ] ; then
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
         fi
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master PROVISION_LOGS
 
-        spinner "Waiting for kubectl" "sleep 300"
-
-        if kubectl get nodes | grep --quiet "$IP"; then
+        if [ "${PROVISION_LOGS##*$'\n'}" = "provisioned master" ]; then
           spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
         else
-          tput el
-          echo "${CYAN}[$LINODE_ID]${NORMAL} Master node is uncontactable! Please run kube-linode again to re-provision."
-          exit 1
+          install master $LINODE_ID
         fi
     fi
 
     if [ "$NODE_TYPE" = "worker" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node (might take a while)" provision_worker
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node (might take a while)" provision_worker PROVISION_LOGS
+        if [ "${PROVISION_LOGS##*$'\n'}" = "provisioned worker" ]; then
+          spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+        else
+          install worker $LINODE_ID
+        fi
     fi
 }
 
@@ -374,12 +364,14 @@ provision_master() {
   kubectl create -f $DIR/heapster.yaml --validate=false
   cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
   cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
+  echo "provisioned master"
 }
 
 provision_worker() {
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh"
+  echo "provisioned worker"
 }
 
 update_script() {

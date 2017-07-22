@@ -122,11 +122,6 @@ storage:
               exit 1
           }
 
-          mkdir -p /opt/bin
-          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd
-          chmod +x /opt/bin/rbd
-          /opt/bin/rbd
-
           wget -P /home/${REMOTE_USER} https://github.com/kahkhang/kube-linode/raw/bootkube/bootkube.tar.gz
           tar -xzvf /home/${REMOTE_USER}/bootkube.tar.gz -C /home/${REMOTE_USER}
           chmod +x /home/${REMOTE_USER}/bootkube
@@ -168,7 +163,6 @@ systemd:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/inactive-manifests
         ExecStartPre=/bin/mkdir -p /var/lib/cni
         ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/cache/kubelet-pod.uuid
-        ExecStartPre=/bin/mkdir -p /mnt/disks
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --allow-privileged \
           --anonymous-auth=false \
@@ -194,4 +188,4 @@ systemd:
         [Install]
         WantedBy=multi-user.target
 #sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g'
-#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/%24%7BUSERNAME%7D/${USERNAME}/g' | jq
+#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/%24%7BUSERNAME%7D/${USERNAME}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy
