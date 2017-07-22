@@ -257,14 +257,16 @@ install() {
     INSTALL_DISK_SIZE=1024
     STORAGE_DISK_SIZE=0
 
-    tput el
-    text_input "Enter local storage size (comma separated in mb, total below ${TOTAL_DISK_SIZE}mb):" \
-           DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
-    stty -echo
-    tput civis
-    tput cuu1
-    tput el
-    tput el1
+    if [ "$NODE_TYPE" = "worker" ] ; then
+      tput el
+      text_input "Enter local storage size (comma separated in mb, total below ${TOTAL_DISK_SIZE}mb):" \
+             DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
+      stty -echo
+      tput civis
+      tput cuu1
+      tput el
+      tput el1
+    fi
 
     IFS=$'\n'
     DISK_SIZES=($(echo $DISK_SIZES_INPUT | tr ',' '\n'))
@@ -336,7 +338,7 @@ EOF
         fi
         spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
 
-        #spinner "Waiting for kubectl" "sleep 30"
+        spinner "Waiting for kubectl" "sleep 300"
 
         if kubectl get nodes | grep --quiet "$IP"; then
           spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
