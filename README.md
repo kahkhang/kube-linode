@@ -39,13 +39,11 @@ Arch Linux: Follow the instructions [here](https://github.com/kahkhang/kube-lino
 
 
 ### High Availability Setup
-1) Convert a worker node to a master node:
-
-    ```
-    kubectl label node $IP "node-role.kubernetes.io/master="
-    ```
-
-2) Scale the etcd operator
+1. Convert a worker node to a master node:
+```
+kubectl label node $IP "node-role.kubernetes.io/master="
+```
+2. Scale the etcd operator
 
 ### Acknowledgements
 This script uses [Bootkube](https://github.com/kubernetes-incubator/bootkube) to bootstrap the initial cluster using [Linode's API](https://www.linode.com/api).
