@@ -2,6 +2,7 @@
 _SPINNER_POS=0
 _TASK_OUTPUT=""
 spinner() {
+    IFS=$'\n'
     _TASK_OUTPUT=""
     local delay=0.05
     local list=( $(echo -e '\xe2\xa0\x8b')

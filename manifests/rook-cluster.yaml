@@ -39,8 +39,7 @@ spec:
 #      tolerations:
   storage:                # cluster level storage configuration and selection
     useAllNodes: true
-    useAllDevices: false
-    deviceFilter: sd[b-h]
+    useAllDevices: true
     metadataDevice:
     location:
     storeConfig:
