@@ -45,16 +45,18 @@ storage:
               sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
 
               # Start services
-              systemctl daemon-reload
-              systemctl stop update-engine; systemctl mask update-engine
-              systemctl enable kubelet; sudo systemctl start kubelet
+              systemctl daemon-reload >/dev/null 2>/dev/null
+              systemctl stop update-engine >/dev/null 2>/dev/null
+              systemctl mask update-engine >/dev/null 2>/dev/null
+              systemctl enable kubelet >/dev/null 2>/dev/null
+              sudo systemctl start kubelet >/dev/null 2>/dev/null
           }
 
 
-          mkdir -p /opt/bin
-          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd
-          chmod +x /opt/bin/rbd
-          /opt/bin/rbd
+          mkdir -p /opt/bin >/dev/null 2>/dev/null
+          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd >/dev/null 2>/dev/null
+          chmod +x /opt/bin/rbd >/dev/null 2>/dev/null
+          /opt/bin/rbd >/dev/null 2>/dev/null
 
           init_worker_node
       mode: 0700

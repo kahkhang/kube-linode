@@ -298,7 +298,7 @@ EOF
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning $NODE_TYPE node (might take a while)" provision_$NODE_TYPE PROVISION_LOGS
 
-    if [ "${PROVISION_LOGS##*$'\n'}" = "provisioned $NODE_TYPE" ]; then
+    if [ "$( echo "${PROVISION_LOGS}" | tail -n1 )" = "provisioned $NODE_TYPE" ]; then
       spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
     else
       install $NODE_TYPE $LINODE_ID
@@ -328,9 +328,9 @@ provision_master() {
 }
 
 provision_worker() {
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh"
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh" 2>/dev/null >/dev/null
   echo "provisioned worker"
 }
 
