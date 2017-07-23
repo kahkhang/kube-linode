@@ -331,6 +331,12 @@ provision_worker() {
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh" 2>/dev/null >/dev/null
+  kubectl apply -f $DIR/manifests/rook-operator.yaml
+  while true; do
+    kubectl apply -f $DIR/manifests/rook-cluster.yaml && break
+    sleep 3
+  done
+  kubectl apply -f $DIR/manifests/rook-storageclass.yaml
   echo "provisioned worker"
 }
 

@@ -16,6 +16,8 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
    name: rook-block
+   annotations:
+     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: rook.io/block
 parameters:
   pool: replicapool

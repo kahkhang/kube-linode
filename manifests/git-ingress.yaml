@@ -1,7 +1,7 @@
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: gogs-ingress
+  name: git-ingress
   annotations:
     kubernetes.io/ingress.class: "traefik"
 spec:
@@ -10,5 +10,5 @@ spec:
       http:
         paths:
           - backend:
-              serviceName: gogs-gogs
+              serviceName: git-gitlab-ce
               servicePort: 80
