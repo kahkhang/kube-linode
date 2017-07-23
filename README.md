@@ -21,10 +21,9 @@ The cluster will comprise of a single Kubernetes master host with a custom numbe
 git clone https://github.com/kahkhang/kube-linode
 cd kube-linode
 chmod +x kube-linode.sh
-./kube-linode.sh
 ```
 
-Just run `kube-linode` into your console, key in your configuration, then sit back and have a :coffee:!
+Just run `./kube-linode.sh` into your console, key in your configuration, then sit back and have a :coffee:!
 
 Settings are stored in `settings.env`.
 
