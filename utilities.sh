@@ -321,9 +321,9 @@ provision_master() {
   yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
   kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
 
-  kubectl create -f $DIR/heapster.yaml --validate=false
-  cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
-  cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
+  kubectl create -f $DIR/manifests/heapster.yaml --validate=false
+  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
+  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
   echo "provisioned master"
 }
 
