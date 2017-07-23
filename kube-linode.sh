@@ -37,10 +37,10 @@ unset API_KEY
 stty -echo
 tput civis
 
-if [ -f ~/.kube-linode/settings.env ] ; then
-    . ~/.kube-linode/settings.env
+if [ -f $DIR/settings.env ] ; then
+    . $DIR/settings.env
 else
-    touch ~/.kube-linode/settings.env
+    touch $DIR/settings.env
 fi
 
 read_api_key
@@ -61,9 +61,9 @@ else
     ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa >/dev/null 2>&1
 fi
 
-if [ -f ~/.kube-linode/auth ]  ; then : ; else
+if [ -f $DIR/auth ]  ; then : ; else
     echo "Key in your dashboard password (Required for https://kube.$DOMAIN, https://traefik.$DOMAIN)"
-    htpasswd -c ~/.kube-linode/auth $USERNAME
+    htpasswd -c $DIR/auth $USERNAME
 fi
 
 spinner "Updating install script" update_script SCRIPT_ID
@@ -82,10 +82,6 @@ if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
 
    spinner "${CYAN}[$MASTER_ID]${NORMAL} Initializing labels" \
            "linode_api linode.update LinodeID=$MASTER_ID Label=\"master_${MASTER_ID}\" lpm_displayGroup=\"$DOMAIN (Unprovisioned)\""
-
-   if [ -d ~/.kube-linode/certs ]; then
-     spinner "${CYAN}[$MASTER_ID]${NORMAL} Removing existing certificates" "rm -rf ~/.kube-linode/certs"
-   fi
 fi
 
 spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting public IP" "get_public_ip $MASTER_ID" MASTER_IP

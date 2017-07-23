@@ -1,8 +1,7 @@
 #!/bin/bash
 _SPINNER_POS=0
-_TASK_OUTPUT=""
 spinner() {
-    _TASK_OUTPUT=""
+    IFS=$'\n'
     local delay=0.05
     local list=( $(echo -e '\xe2\xa0\x8b')
                  $(echo -e '\xe2\xa0\x99')
@@ -36,11 +35,10 @@ spinner() {
         sleep $delay
         printf "\b\b\b"
     done
-    _TASK_OUTPUT="$(cat $tempfile)"
-    rm $tempfile
     _SPINNER_POS=$i
 
     if [ -z $3 ]; then :; else
-      eval $3=\'"$_TASK_OUTPUT"\'
+      eval $3=\'"$(cat $tempfile)"\'
     fi
+    rm $tempfile
 }

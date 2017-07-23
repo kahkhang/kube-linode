@@ -198,12 +198,12 @@ boot_linode() {
 
 update_coreos_config() {
   linode_api linode.config.update LinodeID=$LINODE_ID ConfigID=$CONFIG_ID Label="CoreOS" \
-      DiskList=$DISK_ID,$(join STORAGE_DISK_IDS ",") KernelID=213 RootDeviceNum=1 helper_network=false
+      DiskList=$DISK_ID KernelID=213 RootDeviceNum=1 helper_network=false
 }
 
 transfer_acme() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
-  "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < ~/.kube-linode/acme.json )' \
+  "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < $DIR/acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
 }
 
@@ -224,29 +224,12 @@ change_to_unprovisioned() {
   linode_api linode.update LinodeID=$LINODE_ID Label="${NODE_TYPE}_${LINODE_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)"
 }
 
-validate_disk_sizes() {
-  IFS=$'\n'
-  local sizes=($(echo $1 | tr ',' '\n'))
-  local total_size=0
-  for disk_size in ${sizes[@]}; do
-    total_size=$(($total_size+$disk_size))
-  done
-
-  if [ $total_size -le $TOTAL_DISK_SIZE ]; then
-    echo true
-  else
-    echo false
-  fi
-}
-
 install() {
     local NODE_TYPE
     local LINODE_ID
     local PLAN
     local ROOT_PASSWORD
     local COREOS_OLD_DISK_SIZE
-    local COREOS_DISK_SIZE
-    local STORAGE_DISK_SIZE
     NODE_TYPE=$1
     LINODE_ID=$2
     reset_linode $LINODE_ID
@@ -255,30 +238,7 @@ install() {
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving maximum available disk size" "get_max_disk_size $PLAN" TOTAL_DISK_SIZE
 
     INSTALL_DISK_SIZE=1024
-    STORAGE_DISK_SIZE=0
-
-    tput el
-    text_input "Enter local storage size (comma separated in mb, total below ${TOTAL_DISK_SIZE}mb):" \
-           DISK_SIZES_INPUT "^[0-9]+(,[0-9]+){0,6}$" "Enter valid disk sizes" validate_disk_sizes
-    stty -echo
-    tput civis
-    tput cuu1
-    tput el
-    tput el1
-
-    IFS=$'\n'
-    DISK_SIZES=($(echo $DISK_SIZES_INPUT | tr ',' '\n'))
-    STORAGE_DISK_IDS=()
-    for DISK_SIZE in ${DISK_SIZES[@]}; do
-      if [ "$DISK_SIZE" -gt "0" ]; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating ${DISK_SIZE}mb storage disk" "create_ext4_disk $LINODE_ID $DISK_SIZE Storage" STORAGE_DISK_ID
-        STORAGE_DISK_SIZE=$(($STORAGE_DISK_SIZE+$DISK_SIZE))
-        STORAGE_DISK_IDS+=( $STORAGE_DISK_ID )
-      fi
-    done
-
-    COREOS_OLD_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
-    COREOS_DISK_SIZE=$( echo "${TOTAL_DISK_SIZE}-${STORAGE_DISK_SIZE}" | bc )
+    COREOS_OLD_DISK_SIZE=$((${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}))
 
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
 
@@ -288,21 +248,12 @@ install() {
         PARAMS=$( cat <<-EOF
           {
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
-              "ip": "$IP",
               "node_type": "$NODE_TYPE",
-              "advertise_ip": "$IP",
               "PUBLIC_IP": "$IP",
               "PRIVATE_IP": "$PRIVATE_IP",
-              "etcd_endpoint" : "http://${MASTER_IP}:2379",
-              "k8s_ver": "v1.7.0_coreos.0",
-              "dns_service_ip": "10.3.0.10",
-              "k8s_service_ip": "10.3.0.1",
-              "service_ip_range": "10.3.0.0/24",
-              "pod_network": "10.2.0.0/16",
               "USERNAME": "$USERNAME",
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
-              "MASTER_IP" : "$MASTER_IP",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -313,21 +264,12 @@ EOF
         PARAMS=$( cat <<-EOF
           {
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
-              "ip": "$IP",
               "node_type": "$NODE_TYPE",
-              "advertise_ip": "$IP",
               "PUBLIC_IP": "$IP",
               "PRIVATE_IP": "$PRIVATE_IP",
-              "etcd_endpoint" : "http://${MASTER_IP}:2379",
-              "k8s_ver": "v1.7.0_coreos.0",
-              "dns_service_ip": "10.3.0.10",
-              "k8s_service_ip": "10.3.0.1",
-              "service_ip_range": "10.3.0.0/24",
-              "pod_network": "10.2.0.0/16",
               "USERNAME": "$USERNAME",
               "DOMAIN" : "$DOMAIN",
               "EMAIL" : "$EMAIL",
-              "MASTER_IP" : "$MASTER_IP",
               "LINODE_ID": "$LINODE_ID"
           }
 EOF
@@ -344,27 +286,22 @@ EOF
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Installing CoreOS (might take a while)" "wait_boot $LINODE_ID"
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Shutting down CoreOS" "linode_api linode.shutdown LinodeID=$LINODE_ID"
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting install disk $INSTALL_DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$INSTALL_DISK_ID"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Resizing CoreOS disk $DISK_ID" "linode_api linode.disk.resize LinodeID=$LINODE_ID DiskID=$DISK_ID Size=$COREOS_DISK_SIZE"
+    spinner "${CYAN}[$LINODE_ID]${NORMAL} Resizing CoreOS disk $DISK_ID" "linode_api linode.disk.resize LinodeID=$LINODE_ID DiskID=$DISK_ID Size=$TOTAL_DISK_SIZE"
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
     spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
     if [ "$NODE_TYPE" = "master" ] ; then
-        if [ -e ~/.kube-linode/acme.json ] ; then
+        if [ -e $DIR/acme.json ] ; then
             spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
-        fi
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning master node (might take a while)" provision_master
-        if kubectl get nodes | grep --quiet "$IP"; then
-          spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
-        else
-          tput el
-          echo "${CYAN}[$LINODE_ID]${NORMAL} Master node is uncontactable! Please run kube-linode again to re-provision."
-          exit 1
         fi
     fi
 
-    if [ "$NODE_TYPE" = "worker" ] ; then
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning worker node (might take a while)" provision_worker
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+    spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning $NODE_TYPE node (might take a while)" provision_$NODE_TYPE PROVISION_LOGS
+
+    if [ "$( echo "${PROVISION_LOGS}" | tail -n1 )" = "provisioned $NODE_TYPE" ]; then
+      spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+    else
+      install $NODE_TYPE $LINODE_ID
     fi
 }
 
@@ -386,24 +323,31 @@ provision_master() {
 
   kubectl create -f $DIR/heapster.yaml --validate=false
   cat $DIR/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
-  kubectl create -f $DIR/local-storage.yaml --validate=false
   cat $DIR/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
+  echo "provisioned master"
 }
 
 provision_worker() {
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh"
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh" 2>/dev/null >/dev/null
+  kubectl apply -f $DIR/manifests/rook-operator.yaml
+  while true; do
+    kubectl apply -f $DIR/manifests/rook-cluster.yaml && break
+    sleep 3
+  done
+  kubectl apply -f $DIR/manifests/rook-storageclass.yaml
+  echo "provisioned worker"
 }
 
 update_script() {
   local SCRIPT_ID
   SCRIPT_ID=$( linode_api stackscript.list | jq ".DATA" | jq -c '.[] | select(.LABEL == "CoreOS_Kube_Cluster") | .STACKSCRIPTID' | sed -n 1p )
   if ! [[ $SCRIPT_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
-      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat ~/.kube-linode/install-coreos.sh )" \
+      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat $DIR/install-coreos.sh )" \
                   | jq ".DATA.StackScriptID" )
   else
-      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat ~/.kube-linode/install-coreos.sh )" >/dev/null
+      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat $DIR/install-coreos.sh )" >/dev/null
   fi
   echo $SCRIPT_ID
 }
@@ -433,9 +377,9 @@ read_api_key() {
          tput civis
       done
   fi
-   sed -i.bak '/^API_KEY/d' ~/.kube-linode/settings.env
-   echo "API_KEY=$API_KEY" >> ~/.kube-linode/settings.env
-   rm ~/.kube-linode/settings.env.bak
+   sed -i.bak '/^API_KEY/d' $DIR/settings.env
+   echo "API_KEY=$API_KEY" >> $DIR/settings.env
+   rm $DIR/settings.env.bak
 }
 
 check_api_key() {
@@ -462,7 +406,7 @@ read_master_plan() {
 
          MASTER_PLAN=${plan_ids[$selected_disk_id]}
       done
-      echo "MASTER_PLAN=$MASTER_PLAN" >> ~/.kube-linode/settings.env
+      echo "MASTER_PLAN=$MASTER_PLAN" >> $DIR/settings.env
   fi
 
 }
@@ -480,7 +424,7 @@ read_worker_plan() {
 
          WORKER_PLAN=${plan_ids[$selected_disk_id]}
       done
-      echo "WORKER_PLAN=$WORKER_PLAN" >> ~/.kube-linode/settings.env
+      echo "WORKER_PLAN=$WORKER_PLAN" >> $DIR/settings.env
   fi
 
 }
@@ -500,7 +444,7 @@ read_datacenter() {
          list_input_index "Select a datacenter" datacenters_list selected_data_center_index
          DATACENTER_ID=${datacenters_ids[$selected_data_center_index]}
       done
-      echo "DATACENTER_ID=$DATACENTER_ID" >> ~/.kube-linode/settings.env
+      echo "DATACENTER_ID=$DATACENTER_ID" >> $DIR/settings.env
   fi
 }
 
@@ -509,7 +453,7 @@ read_domain() {
       while ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; do
          text_input "Enter Domain Name: " DOMAIN "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$" "Please enter a valid domain name"
       done
-      echo "DOMAIN=$DOMAIN" >> ~/.kube-linode/settings.env
+      echo "DOMAIN=$DOMAIN" >> $DIR/settings.env
   fi
   tput civis
 }
@@ -520,7 +464,7 @@ read_email() {
       while ! [[ $EMAIL =~ $email_regex ]] 2>/dev/null; do
          text_input "Enter Email: " EMAIL "^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$" "Please enter a valid email"
       done
-      echo "EMAIL=$EMAIL" >> ~/.kube-linode/settings.env
+      echo "EMAIL=$EMAIL" >> $DIR/settings.env
   fi
   tput civis
 }
@@ -563,7 +507,6 @@ update_dns() {
   local LINODE_ID=$1
   local DOMAIN_ID
   local IP
-  local IP_ADDRESS_ID
   local RESOURCE_IDS
   eval IP=\$PUBLIC_$LINODE_ID
   spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
@@ -594,7 +537,7 @@ read_no_of_workers() {
       while ! [[ $NO_OF_WORKERS =~ ^[0-9]+$ ]] 2>/dev/null; do
          text_input "Enter number of workers: " NO_OF_WORKERS "^[0-9]+$" "Please enter a number"
       done
-      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> ~/.kube-linode/settings.env
+      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> $DIR/settings.env
   fi
   tput civis
 }

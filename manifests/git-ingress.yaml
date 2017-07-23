@@ -1,0 +1,14 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: git-ingress
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+spec:
+  rules:
+    - host: git.kahkhang.me
+      http:
+        paths:
+          - backend:
+              serviceName: git-gitlab-ce
+              servicePort: 80

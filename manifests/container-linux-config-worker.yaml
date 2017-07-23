@@ -1,0 +1,125 @@
+passwd:
+  users:
+    - name: ${USERNAME}
+      ssh_authorized_keys:
+        - "$SSH_KEY"
+      create:
+        groups:
+          - "sudo"
+          - "docker"
+          - "systemd-journal"
+        shell: /bin/bash
+storage:
+  files:
+    - path: /etc/environment
+      filesystem: root
+      contents:
+        inline: |
+          COREOS_PUBLIC_IPV4=${PUBLIC_IP}
+          COREOS_PRIVATE_IPV4=${PRIVATE_IP}
+      mode: 0644
+    - path: /home/${USERNAME}/bootstrap.sh
+      filesystem: root
+      contents:
+        inline: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          REMOTE_PORT=${REMOTE_PORT:-22}
+          REMOTE_USER=${REMOTE_USER:-core}
+          IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
+          TAG_MASTER=${TAG_MASTER:-false}
+          CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
+
+          # Initialize a worker node
+          function init_worker_node() {
+
+              # Setup kubeconfig
+              mkdir -p /etc/kubernetes
+              cp /home/${REMOTE_USER}/kubeconfig /etc/kubernetes/kubeconfig
+              # Pulled out of the kubeconfig. Other installations should place the root
+              # CA here manually.
+              grep 'certificate-authority-data' /home/${REMOTE_USER}/kubeconfig | awk '{print $2}' | base64 -d > /etc/kubernetes/ca.crt
+
+              # Set cloud provider
+              sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
+
+              # Start services
+              systemctl daemon-reload >/dev/null 2>/dev/null
+              systemctl stop update-engine >/dev/null 2>/dev/null
+              systemctl mask update-engine >/dev/null 2>/dev/null
+              systemctl enable kubelet >/dev/null 2>/dev/null
+              sudo systemctl start kubelet >/dev/null 2>/dev/null
+          }
+
+
+          mkdir -p /opt/bin >/dev/null 2>/dev/null
+          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd >/dev/null 2>/dev/null
+          chmod +x /opt/bin/rbd >/dev/null 2>/dev/null
+          /opt/bin/rbd >/dev/null 2>/dev/null
+
+          init_worker_node
+      mode: 0700
+networkd:
+  units:
+    - name: 00-eth0.network
+      contents: |
+        [Match]
+        Name=eth0
+
+        [Network]
+        DHCP=no
+        DNS= $(cat /etc/resolv.conf | awk '/^nameserver /{ print $0 }' | sed 's/nameserver //g' | tr '\n' ' ')
+        Domains=members.linode.com
+        IPv6PrivacyExtensions=false
+        Gateway=${PUBLIC_IP%.*}.1
+        Address=${PUBLIC_IP}/24
+        Address=${PRIVATE_IP}/17
+systemd:
+  units:
+    - name: kubelet.service
+      enable: true
+      contents: |
+        [Service]
+        Environment=KUBELET_IMAGE_URL=quay.io/coreos/hyperkube
+        Environment=KUBELET_IMAGE_TAG=v1.7.1_coreos.0
+        Environment=PATH=/opt/bin/:/usr/bin/:/usr/sbin:$PATH
+        Environment="RKT_RUN_ARGS=\
+        --uuid-file-save=/var/cache/kubelet-pod.uuid \
+        --volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf \
+        --volume opt-cni-bin,kind=host,source=/opt/cni/bin --mount volume=opt-cni-bin,target=/opt/cni/bin \
+        --volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log \
+        --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni \
+        --volume modprobe,kind=host,source=/usr/sbin/modprobe --mount volume=modprobe,target=/usr/sbin/modprobe \
+        --volume lib-modules,kind=host,source=/lib/modules --mount volume=lib-modules,target=/lib/modules"
+        EnvironmentFile=/etc/environment
+        ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
+        ExecStartPre=/bin/mkdir -p /opt/cni/bin
+        ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
+        ExecStartPre=/bin/mkdir -p /var/lib/cni
+        ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/cache/kubelet-pod.uuid
+        ExecStartPre=/usr/bin/mkdir -p /opt/bin
+        ExecStart=/usr/lib/coreos/kubelet-wrapper \
+          --allow-privileged \
+          --anonymous-auth=false \
+          --client-ca-file=/etc/kubernetes/ca.crt \
+          --cloud-provider= \
+          --cluster_dns=10.3.0.10 \
+          --cluster_domain=cluster.local \
+          --cni-conf-dir=/etc/kubernetes/cni/net.d \
+          --exit-on-lock-contention \
+          --hostname-override=${COREOS_PUBLIC_IPV4} \
+          --kubeconfig=/etc/kubernetes/kubeconfig \
+          --lock-file=/var/run/lock/kubelet.lock \
+          --minimum-container-ttl-duration=3m0s \
+          --network-plugin=cni \
+          --pod-manifest-path=/etc/kubernetes/manifests \
+          --require-kubeconfig
+        ExecStop=-/usr/bin/rkt stop --uuid-file=/var/cache/kubelet-pod.uuid
+        Restart=always
+        RestartSec=5
+
+        [Install]
+        WantedBy=multi-user.target
+
+#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config-worker.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/%24%7BREMOTE_USER%3A-core%7D/${USERNAME}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy
