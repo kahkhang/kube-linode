@@ -9,7 +9,8 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-source $DIR/utilities.sh
+source $DIR/display.sh
+source $DIR/linode-utilities.sh
 
 check_dep jq
 check_dep openssl
