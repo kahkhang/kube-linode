@@ -29,11 +29,14 @@ Settings are stored in `settings.env`.
 
 To increase the number of workers, modify `NO_OF_WORKERS` in `settings.env` as desired and run `./kube-linode.sh` again.
 
+Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)
+
 ### Dependencies
 You should have a Linode account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
 You should also have an API Key with a valid domain that uses [Linode's DNS servers](https://www.linode.com/docs/networking/dns/dns-manager-overview#set-domain-names-to-use-linodes-name-servers).
 
 OSX: ``` brew install jq openssl curl kubectl ```
+
 Arch Linux: Follow the instructions [here](https://github.com/kahkhang/kube-linode/issues/4#issuecomment-311601422)
 
 
