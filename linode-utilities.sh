@@ -1,16 +1,4 @@
 #!/bin/bash
-
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
-  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
-done
-DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-
-source $DIR/inquirer.sh
-source $DIR/ora.sh
-
 set +e
 base64_args=""
 $(base64 --wrap=0 <(echo "test") >/dev/null 2>&1)
@@ -253,8 +241,7 @@ install() {
               "PRIVATE_IP": "$PRIVATE_IP",
               "USERNAME": "$USERNAME",
               "DOMAIN" : "$DOMAIN",
-              "EMAIL" : "$EMAIL",
-              "LINODE_ID": "$LINODE_ID"
+              "EMAIL" : "$EMAIL"
           }
 EOF
         )
@@ -269,8 +256,7 @@ EOF
               "PRIVATE_IP": "$PRIVATE_IP",
               "USERNAME": "$USERNAME",
               "DOMAIN" : "$DOMAIN",
-              "EMAIL" : "$EMAIL",
-              "LINODE_ID": "$LINODE_ID"
+              "EMAIL" : "$EMAIL"
           }
 EOF
         )
