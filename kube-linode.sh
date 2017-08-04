@@ -1,4 +1,10 @@
 #!/bin/bash
+set +e
+base64_args=""
+$(base64 --wrap=0 <(echo "test") >/dev/null 2>&1)
+if [ $? -eq 0 ]; then
+    base64_args="--wrap=0"
+fi
 set -e
 
 SOURCE="${BASH_SOURCE[0]}"
@@ -62,9 +68,22 @@ else
     ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa >/dev/null 2>&1
 fi
 
-if [ -f $DIR/auth ]  ; then : ; else
-    echo "Key in your dashboard password (Required for https://kube.$DOMAIN, https://traefik.$DOMAIN)"
-    htpasswd -c $DIR/auth $USERNAME
+if [[ -f $DIR/auth && -f $DIR/manifests/grafana/grafana-credentials.yaml ]]  ; then : ; else
+    read -s -p "Enter your dashboard password: " PASSWORD
+    tput cub "$(tput cols)"
+    tput el
+    [ -e $DIR/auth ] && rm $DIR/auth
+    htpasswd -b -c $DIR/auth $USERNAME $PASSWORD >/dev/null 2>&1
+    [ -e $DIR/manifests/grafana/grafana-credentials.yaml ] && rm $DIR/manifests/grafana/grafana-credentials.yaml
+cat > $DIR/manifests/grafana/grafana-credentials.yaml <<-EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-credentials
+data:
+  user: $( echo -n $USERNAME | base64 $base64_args )
+  password: $( echo -n $PASSWORD | base64 $base64_args )
+EOF
 fi
 
 spinner "Updating install script" update_script SCRIPT_ID

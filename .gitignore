@@ -9,3 +9,4 @@ package.sh
 demo.mov
 resolv.conf
 bootkube
+manifests/grafana/grafana-credentials.yaml

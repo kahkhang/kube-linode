@@ -17,7 +17,7 @@ The cluster will comprise of a single Kubernetes master host with a custom numbe
   * https://prometheus.example.com ([Prometheus Web UI](https://github.com/prometheus/prometheus))
   * https://traefik.example.com ([Traefik Web UI](https://github.com/containous/traefik#web-ui))
 * Distributed block storage with [Rook](https://github.com/rook/rook)
-
+* Pre-configured [Grafana](https://github.com/grafana/grafana) dashboard using [Kube-Prometheus](https://github.com/coreos/prometheus-operator/tree/master/contrib/kube-prometheus)
 ### Usage
 
 ```sh

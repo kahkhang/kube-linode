@@ -14,9 +14,19 @@ spec:
         image: grafana/grafana:4.4.1
         env:
         - name: GF_AUTH_BASIC_ENABLED
-          value: "false"
+          value: "true"
         - name: GF_AUTH_ANONYMOUS_ENABLED
           value: "true"
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-credentials
+              key: user
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-credentials
+              key: password
         volumeMounts:
         - name: grafana-storage
           mountPath: /var/grafana-storage
@@ -34,7 +44,18 @@ spec:
         image: quay.io/coreos/grafana-watcher:v0.0.6
         args:
           - '--watch-dir=/var/grafana-dashboards'
-          - '--grafana-url=http://admin:admin@127.0.0.1:3000'
+          - '--grafana-url=http://localhost:3000'
+        env:
+        - name: GRAFANA_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-credentials
+              key: user
+        - name: GRAFANA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-credentials
+              key: password
         resources:
           requests:
             memory: "16Mi"
