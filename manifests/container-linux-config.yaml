@@ -122,7 +122,7 @@ storage:
               exit 1
           }
 
-          wget -P /home/${REMOTE_USER} https://github.com/kahkhang/kube-linode/raw/bootkube/bootkube.tar.gz
+          wget -P /home/${REMOTE_USER} https://github.com/kahkhang/kube-linode/raw/master/bootkube.tar.gz
           tar -xzvf /home/${REMOTE_USER}/bootkube.tar.gz -C /home/${REMOTE_USER}
           chmod +x /home/${REMOTE_USER}/bootkube
           init_master_node
