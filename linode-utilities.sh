@@ -1,11 +1,7 @@
 #!/bin/bash
-set +e
-base64_args=""
-$(base64 --wrap=0 <(echo "test") >/dev/null 2>&1)
-if [ $? -eq 0 ]; then
-    base64_args="--wrap=0"
+if [ -z "${KUBECONFIG}" ]; then
+    export KUBECONFIG=~/.kube/config
 fi
-set -e
 
 control_c() {
   tput cub "$(tput cols)"
@@ -306,10 +302,15 @@ provision_master() {
 
   yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
   kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
-
-  kubectl create -f $DIR/manifests/heapster.yaml --validate=false
-  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
-  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
+  if kubectl get namespaces | grep -q "monitoring"; then
+    echo "namespace monitoring exists"
+  else
+    kubectl create namespace "monitoring"
+  fi
+  kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth
+  kubectl apply -f $DIR/manifests/heapster.yaml --validate=false
+  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --validate=false -f -
+  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --validate=false -f -
   echo "provisioned master"
 }
 
@@ -323,6 +324,23 @@ provision_worker() {
     sleep 3
   done
   kubectl apply -f $DIR/manifests/rook-storageclass.yaml
+  kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator
+  printf "Waiting for Operator to register third party objects..."
+  until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
+  until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
+  until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
+  echo "done!"
+
+  kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter
+  kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics
+  kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml
+  kubectl --namespace monitoring apply -f $DIR/manifests/grafana
+  find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml -exec kubectl --namespace "monitoring" apply -f {} \;
+  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml
+  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml
+  kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/
+  cat $DIR/manifests/prometheus-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --validate=false -f -
+
   echo "provisioned worker"
 }
 
@@ -385,8 +403,8 @@ read_master_plan() {
       while ! [[ $MASTER_PLAN =~ ^-?[0-9]+$ ]] 2>/dev/null; do
          IFS=$'\n'
          spinner "Retrieving plans" get_plans plan_data
-         local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
-         local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
+         local plan_ids=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | .PLANID'))
+         local plan_list=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | [.RAM, .PRICE] | @csv' | \
            awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' 2>/dev/null))
          list_input_index "Select a master plan (https://www.linode.com/pricing)" plan_list selected_disk_id
 

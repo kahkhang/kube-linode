@@ -1,0 +1,29 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    ingress.kubernetes.io/auth-type: "basic"
+    ingress.kubernetes.io/auth-secret: "kubesecret"
+spec:
+  rules:
+    - host: alertmanager.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: alertmanager-main
+              servicePort: web
+    - host: prometheus.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: prometheus-k8s
+              servicePort: web
+    - host: grafana.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: grafana
+              servicePort: web
