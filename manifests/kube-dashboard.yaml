@@ -68,7 +68,7 @@ spec:
         paths:
           - backend:
               serviceName: traefik-console
-              servicePort: webui
+              servicePort: web
 ---
 apiVersion: v1
 kind: Service
@@ -82,5 +82,6 @@ spec:
   selector:
     k8s-app: kubernetes-dashboard
   ports:
-  - port: 80
-    targetPort: 9090
+    - port: 80
+      name: web
+      targetPort: 9090

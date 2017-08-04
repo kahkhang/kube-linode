@@ -7,6 +7,10 @@ if [ $? -eq 0 ]; then
 fi
 set -e
 
+if [ -z "${KUBECONFIG}" ]; then
+    export KUBECONFIG=~/.kube/config
+fi
+
 control_c() {
   tput cub "$(tput cols)"
   tput el
@@ -306,10 +310,12 @@ provision_master() {
 
   yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
   kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
+  kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth
 
-  kubectl create -f $DIR/manifests/heapster.yaml --validate=false
-  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl create --validate=false -f -
-  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl create --validate=false -f -
+  kubectl apply -f $DIR/manifests/heapster.yaml --validate=false
+  sleep 3
+  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --validate=false -f -
+  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --validate=false -f -
   echo "provisioned master"
 }
 
@@ -323,6 +329,29 @@ provision_worker() {
     sleep 3
   done
   kubectl apply -f $DIR/manifests/rook-storageclass.yaml
+
+  if kubectl get namespaces | grep -q "monitoring"; then
+    echo "namespace monitoring exists"
+  else
+    kubectl create namespace "monitoring"
+  fi
+
+  kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator
+  printf "Waiting for Operator to register third party objects..."
+  until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
+  until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
+  until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
+  echo "done!"
+
+  kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter
+  kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics
+  kubectl --namespace monitoring apply -f $DIR/manifests/grafana
+  find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml -exec kubectl --namespace "monitoring" apply -f {} \;
+  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml
+  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml
+  kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/
+  cat $DIR/manifests/prometheus-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --validate=false -f -
+
   echo "provisioned worker"
 }
 
