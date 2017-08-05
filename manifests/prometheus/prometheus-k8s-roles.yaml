@@ -16,6 +16,24 @@ rules:
   - configmaps
   verbs: ["get"]
 ---
+apiVersion: rbac.authorization.k8s.io/v1alpha1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: rook
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
