@@ -40,6 +40,7 @@ unset DOMAIN
 unset EMAIL
 unset MASTER_ID
 unset API_KEY
+unset USERNAME
 
 stty -echo
 tput civis
@@ -57,9 +58,7 @@ read_worker_plan
 read_domain
 read_email
 read_no_of_workers
-
-#TODO: allow entering of username
-USERNAME=$( whoami )
+read_username
 
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""
