@@ -19,7 +19,6 @@ The cluster will comprise of a single Kubernetes master host with a custom numbe
   * https://prometheus.example.com ([Prometheus Web UI](https://github.com/prometheus/prometheus))
   * https://traefik.example.com ([Traefik Web UI](https://github.com/containous/traefik#web-ui))
 ### Usage
-
 ```sh
 git clone https://github.com/kahkhang/kube-linode
 cd kube-linode
