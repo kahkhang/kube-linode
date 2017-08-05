@@ -186,13 +186,13 @@ update_coreos_config() {
 }
 
 transfer_acme() {
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < $DIR/acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
 }
 
 delete_bootstrap_script() {
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
           "rm bootstrap.sh" 2>/dev/null
 }
 
@@ -234,10 +234,7 @@ install() {
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "node_type": "$NODE_TYPE",
               "PUBLIC_IP": "$IP",
-              "PRIVATE_IP": "$PRIVATE_IP",
-              "USERNAME": "$USERNAME",
-              "DOMAIN" : "$DOMAIN",
-              "EMAIL" : "$EMAIL"
+              "PRIVATE_IP": "$PRIVATE_IP"
           }
 EOF
         )
@@ -249,10 +246,7 @@ EOF
               "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
               "node_type": "$NODE_TYPE",
               "PUBLIC_IP": "$IP",
-              "PRIVATE_IP": "$PRIVATE_IP",
-              "USERNAME": "$USERNAME",
-              "DOMAIN" : "$DOMAIN",
-              "EMAIL" : "$EMAIL"
+              "PRIVATE_IP": "$PRIVATE_IP"
           }
 EOF
         )
@@ -288,12 +282,12 @@ EOF
 }
 
 provision_master() {
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" \
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
           "sudo ./bootstrap.sh" 2>/dev/null
   [ -e $DIR/cluster ] && rm -rf $DIR/cluster
   mkdir $DIR/cluster
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r ${USERNAME}@${IP}:/home/${USERNAME}/assets/* $DIR/cluster
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/assets && rm -rf /home/${USERNAME}/bootstrap.sh"
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/home/core/assets/* $DIR/cluster
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/assets && rm -rf /home/core/bootstrap.sh"
 
   mkdir -p $HOME/.kube
   if [ -e $HOME/.kube/config ]; then
@@ -315,9 +309,9 @@ provision_master() {
 }
 
 provision_worker() {
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig ${USERNAME}@${IP}:/home/${USERNAME}/kubeconfig 2>/dev/null >/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "${USERNAME}@$IP" "rm -rf /home/${USERNAME}/kubeconfig && rm -rf /home/${USERNAME}/bootstrap.sh" 2>/dev/null >/dev/null
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig core@${IP}:/home/core/kubeconfig 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
   kubectl apply -f $DIR/manifests/rook-operator.yaml
   while true; do
     kubectl apply -f $DIR/manifests/rook-cluster.yaml && break
@@ -469,6 +463,16 @@ read_email() {
          text_input "Enter Email: " EMAIL "^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$" "Please enter a valid email"
       done
       echo "EMAIL=$EMAIL" >> $DIR/settings.env
+  fi
+  tput civis
+}
+
+read_username() {
+  if [ -z "$USERNAME" ]; then
+    [ -e $DIR/auth ] && rm $DIR/auth
+    [ -e $DIR/manifests/grafana/grafana-credentials.yaml ] && rm $DIR/manifests/grafana/grafana-credentials.yaml
+    text_input "Enter dashboard username: " USERNAME
+    echo "USERNAME=$USERNAME" >> $DIR/settings.env
   fi
   tput civis
 }

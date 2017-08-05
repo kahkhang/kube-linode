@@ -1,14 +1,8 @@
 passwd:
   users:
-    - name: ${USERNAME}
+    - name: core
       ssh_authorized_keys:
         - "$SSH_KEY"
-      create:
-        groups:
-          - "sudo"
-          - "docker"
-          - "systemd-journal"
-        shell: /bin/bash
 storage:
   files:
     - path: /etc/environment
@@ -18,7 +12,7 @@ storage:
           COREOS_PUBLIC_IPV4=${PUBLIC_IP}
           COREOS_PRIVATE_IPV4=${PRIVATE_IP}
       mode: 0644
-    - path: /home/${USERNAME}/bootstrap.sh
+    - path: /home/core/bootstrap.sh
       filesystem: root
       contents:
         inline: |
@@ -26,7 +20,6 @@ storage:
           set -euo pipefail
 
           REMOTE_PORT=${REMOTE_PORT:-22}
-          REMOTE_USER=${REMOTE_USER:-core}
           IDENT=${IDENT:-${HOME}/.ssh/id_rsa}
           TAG_MASTER=${TAG_MASTER:-false}
           CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
@@ -36,10 +29,10 @@ storage:
 
               # Setup kubeconfig
               mkdir -p /etc/kubernetes
-              cp /home/${REMOTE_USER}/kubeconfig /etc/kubernetes/kubeconfig
+              cp /home/core/kubeconfig /etc/kubernetes/kubeconfig
               # Pulled out of the kubeconfig. Other installations should place the root
               # CA here manually.
-              grep 'certificate-authority-data' /home/${REMOTE_USER}/kubeconfig | awk '{print $2}' | base64 -d > /etc/kubernetes/ca.crt
+              grep 'certificate-authority-data' /home/core/kubeconfig | awk '{print $2}' | base64 -d > /etc/kubernetes/ca.crt
 
               # Set cloud provider
               sed -i "s/cloud-provider=/cloud-provider=$CLOUD_PROVIDER/" /etc/systemd/system/kubelet.service
@@ -122,4 +115,4 @@ systemd:
         [Install]
         WantedBy=multi-user.target
 
-#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config-worker.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/%24%7BREMOTE_USER%3A-core%7D/${USERNAME}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy
+#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config-worker.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy

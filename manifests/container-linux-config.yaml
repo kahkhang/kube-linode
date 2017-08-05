@@ -1,14 +1,8 @@
 passwd:
   users:
-    - name: ${USERNAME}
+    - name: core
       ssh_authorized_keys:
         - "$SSH_KEY"
-      create:
-        groups:
-          - "sudo"
-          - "docker"
-          - "systemd-journal"
-        shell: /bin/bash
 storage:
   files:
     - path: "/etc/traefik/acme/acme.json"
@@ -23,14 +17,13 @@ storage:
           COREOS_PUBLIC_IPV4=${PUBLIC_IP}
           COREOS_PRIVATE_IPV4=${PRIVATE_IP}
       mode: 0644
-    - path: /home/${USERNAME}/bootstrap.sh
+    - path: /home/core/bootstrap.sh
       filesystem: root
       contents:
         inline: |
           #!/usr/bin/env bash
           set -euo pipefail
 
-          REMOTE_USER=${USERNAME}
           CLUSTER_DIR=${CLUSTER_DIR:-cluster}
           SELF_HOST_ETCD=${SELF_HOST_ETCD:-true}
           CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY:-false}
@@ -45,9 +38,9 @@ storage:
           function configure_etcd() {
               [ -f "/etc/systemd/system/etcd-member.service.d/10-etcd-member.conf" ] || {
                   mkdir -p /etc/etcd/tls
-                  cp /home/${REMOTE_USER}/assets/tls/etcd-* /etc/etcd/tls
+                  cp /home/core/assets/tls/etcd-* /etc/etcd/tls
                   mkdir -p /etc/etcd/tls/etcd
-                  cp /home/${REMOTE_USER}/assets/tls/etcd/* /etc/etcd/tls/etcd
+                  cp /home/core/assets/tls/etcd/* /etc/etcd/tls/etcd
                   chown -R etcd:etcd /etc/etcd
                   chmod -R u=rX,g=,o= /etc/etcd
                   mkdir -p /etc/systemd/system/etcd-member.service.d
@@ -92,14 +85,14 @@ storage:
               fi
 
               # Render cluster assets
-              /home/${REMOTE_USER}/bootkube render --asset-dir=/home/${REMOTE_USER}/assets ${etcd_render_flags} ${cnp_render_flags} \
+              /home/core/bootkube render --asset-dir=/home/core/assets ${etcd_render_flags} ${cnp_render_flags} \
                 --api-servers=https://${COREOS_PUBLIC_IPV4}:6443,https://${COREOS_PRIVATE_IPV4}:6443
 
               # Move the local kubeconfig into expected location
-              chown -R ${REMOTE_USER}:${REMOTE_USER} /home/${REMOTE_USER}/assets
+              chown -R core:core /home/core/assets
               mkdir -p /etc/kubernetes
-              cp /home/${REMOTE_USER}/assets/auth/kubeconfig /etc/kubernetes/
-              cp /home/${REMOTE_USER}/assets/tls/ca.crt /etc/kubernetes/ca.crt
+              cp /home/core/assets/auth/kubeconfig /etc/kubernetes/
+              cp /home/core/assets/tls/ca.crt /etc/kubernetes/ca.crt
 
               # Start etcd.
               if [ "$SELF_HOST_ETCD" = false ] ; then
@@ -114,7 +107,7 @@ storage:
               systemctl enable kubelet; sudo systemctl start kubelet
 
               # Start bootkube to launch a self-hosted cluster
-              /home/${REMOTE_USER}/bootkube start --asset-dir=/home/${REMOTE_USER}/assets
+              /home/core/bootkube start --asset-dir=/home/core/assets
           }
 
           [ -d "${CLUSTER_DIR}" ] && {
@@ -122,9 +115,9 @@ storage:
               exit 1
           }
 
-          wget -P /home/${REMOTE_USER} https://github.com/kahkhang/kube-linode/raw/master/bootkube.tar.gz
-          tar -xzvf /home/${REMOTE_USER}/bootkube.tar.gz -C /home/${REMOTE_USER}
-          chmod +x /home/${REMOTE_USER}/bootkube
+          wget -P /home/core https://github.com/kahkhang/kube-linode/raw/master/bootkube.tar.gz
+          tar -xzvf /home/core/bootkube.tar.gz -C /home/core
+          chmod +x /home/core/bootkube
           init_master_node
       mode: 0700
 networkd:
@@ -187,5 +180,4 @@ systemd:
 
         [Install]
         WantedBy=multi-user.target
-#sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g'
-#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/%24%7BUSERNAME%7D/${USERNAME}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy
+#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy
