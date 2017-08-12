@@ -189,6 +189,8 @@ transfer_acme() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < $DIR/acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+  "sudo chmod 600 /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
 }
 
 delete_bootstrap_script() {

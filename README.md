@@ -11,7 +11,7 @@ The cluster will comprise of a single Kubernetes master host with a custom numbe
 * [Self-hosted Kubernetes](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/self-hosted-kubernetes.md) with [Bootkube](https://github.com/kubernetes-incubator/bootkube) using self-hosted etcd
 * Load Balancer and automatic SSL/TLS renewal using [Traefik](https://github.com/containous/traefik)
 * Distributed block storage with [Rook](https://github.com/rook/rook)
-* Pre-configured [Grafana](https://github.com/grafana/grafana) dashboard using [Kube-Prometheus](https://github.com/coreos/prometheus-operator/tree/master/contrib/kube-prometheus) with Rook monitoring
+* Pre-configured [Grafana](https://github.com/grafana/grafana) dashboard using [Kube-Prometheus](https://github.com/coreos/prometheus-operator/tree/master/contrib/kube-prometheus) with Rook and Traefik monitoring
 * Basic auth protected subdomains (assuming you are using example.com):
   * https://kube.example.com ([Kubernetes Dashboard](https://github.com/kubernetes/dashboard))
   * https://grafana.example.com ([Grafana](https://github.com/grafana/grafana))
