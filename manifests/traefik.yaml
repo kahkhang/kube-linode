@@ -55,7 +55,11 @@ data:
     onHostRule = true
     caServer = "https://acme-v01.api.letsencrypt.org/directory"
     [[acme.domains]]
-    main = "${DOMAIN}"
+      main = "${DOMAIN}"
+    [web]
+      address = ":8080"
+      [web.metrics.prometheus]
+        Buckets=[0.1,0.3,1.2,5.0]
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -99,6 +103,8 @@ spec:
           args:
             - --configfile=/config/traefik.toml
             - --web
+            - --web.metrics.prometheus
+            - --web.metrics.prometheus.buckets=0.1,0.3,1.2,5.0
             - --kubernetes
             - --logLevel=DEBUG
       tolerations:
