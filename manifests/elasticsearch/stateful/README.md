@@ -10,18 +10,18 @@ The [`es-data-stateful.yaml`](es-data-stateful.yaml) file contains a `volumeClai
 The root directory contains instructions for deploying elasticsearch using a `Deployment` with transient storage for data pods. These brief instructions show a deployment using the `StatefulSet` and `StorageClass`.
 
 ```
-kubectl create -f es-discovery-svc.yaml
-kubectl create -f es-svc.yaml
-kubectl create -f es-master.yaml
+kubectl create -f manifests/elasticsearch/es-discovery-svc.yaml
+kubectl create -f manifests/elasticsearch/es-svc.yaml
+kubectl create -f manifests/elasticsearch/es-master.yaml
 ```
 
 Wait until `es-master` deployment is provisioned, and
 
 ```
-kubectl create -f es-client.yaml
+kubectl create -f manifests/elasticsearch/es-client.yaml
 kubectl create -f gce-storage-class.yaml
-kubectl create -f es-data-svc.yaml
-kubectl create -f es-data-stateful.yaml
+kubectl create -f manifests/elasticsearch/stateful/es-data-svc.yaml
+kubectl create -f manifests/elasticsearch/stateful/es-data-stateful.yaml
 ```
 
 Kubernetes creates the pods for a `StatefulSet` one at a time, waiting for each to come up before starting the next, so it may take a few minutes for all pods to be provisioned. Refer back to the documentation in the root directory for details on testing the cluster, and configuring a curator job to clean up.

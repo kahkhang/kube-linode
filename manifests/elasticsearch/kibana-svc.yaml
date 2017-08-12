@@ -9,7 +9,7 @@ spec:
   selector:
     component: kibana
   ports:
-  - name: http
+  - name: web
     port: 80
     targetPort: 5601
     protocol: TCP

@@ -56,15 +56,15 @@ Providing one's own version of [the images automatically built from this reposit
 ### Deploy
 
 ```
-kubectl create -f es-discovery-svc.yaml
-kubectl create -f es-svc.yaml
-kubectl create -f es-master.yaml
+kubectl create -f manifests/elasticsearch/es-discovery-svc.yaml
+kubectl create -f manifests/elasticsearch/es-svc.yaml
+kubectl create -f manifests/elasticsearch/es-master.yaml
 ```
 
 Wait until `es-master` deployment is provisioned, and
 ```
-kubectl create -f es-client.yaml
-kubectl create -f es-data.yaml
+kubectl create -f manifests/elasticsearch/es-client.yaml
+kubectl create -f manifests/elasticsearch/es-data.yaml
 ```
 
 Wait for containers to be in the `Running` state and check one of the Elasticsearch master nodes logs:
@@ -292,8 +292,8 @@ RUN bin/kibana-plugin remove x-pack
 If ones does provide their own image, one must make sure to alter the following files before deploying:
 
 ```
-kubectl create -f kibana.yaml
-kubectl create -f kibana-svc.yaml
+kubectl create -f manifests/elasticsearch/kibana.yaml
+kubectl create -f manifests/elasticsearch/kibana-svc.yaml
 ```
 
 Kibana will be available through service `kibana`, and one will be able to access it from within the cluster or

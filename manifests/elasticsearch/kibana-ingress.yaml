@@ -1,0 +1,14 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kibana-ingress
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+spec:
+  rules:
+    - host: kibana.kahkhang.me
+      http:
+        paths:
+          - backend:
+              serviceName: kibana
+              servicePort: web
