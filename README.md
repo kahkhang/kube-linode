@@ -1,5 +1,7 @@
 ## :whale: Provision a Kubernetes / CoreOS Cluster on Linode
-[![Bash](https://img.shields.io/badge/language-Bash-green.svg)](https://github.com/kahkhang/kube-linode) [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/kahkhang/kube-linode/master/LICENSE)
+[![Bash](https://img.shields.io/badge/language-Bash-green.svg)](https://github.com/kahkhang/kube-linode)
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/kahkhang/kube-linode/master/LICENSE)
+[![Gitter](https://img.shields.io/gitter/room/kube-linode/support.svg)](https://gitter.im/kube-linode/support)
 
 Automatically provision a scalable CoreOS/Kubernetes cluster on Linode with zero configuration.
 
