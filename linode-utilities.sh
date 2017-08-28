@@ -289,7 +289,7 @@ provision_master() {
   [ -e $DIR/cluster ] && rm -rf $DIR/cluster
   mkdir $DIR/cluster
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/home/core/assets/* $DIR/cluster
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/assets && rm -rf /home/core/bootstrap.sh"
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/bootstrap.sh"
 
   mkdir -p $HOME/.kube
   if [ -e $HOME/.kube/config ]; then
@@ -297,16 +297,16 @@ provision_master() {
   fi
 
   yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
-  kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth
-  if kubectl get namespaces | grep -q "monitoring"; then
+  kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth --request-timeout 0
+  if kubectl --request-timeout 0 get namespaces | grep -q "monitoring"; then
     echo "namespace monitoring exists"
   else
-    kubectl create namespace "monitoring"
+    kubectl create namespace "monitoring" --request-timeout 0
   fi
-  kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth
-  kubectl apply -f $DIR/manifests/heapster.yaml --validate=false
-  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --validate=false -f -
-  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --validate=false -f -
+  kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth --request-timeout 0
+  kubectl apply -f $DIR/manifests/heapster.yaml --validate=false --request-timeout 0
+  cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f -
+  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f -
   echo "provisioned master"
 }
 
@@ -314,28 +314,28 @@ provision_worker() {
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig core@${IP}:/home/core/kubeconfig 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
-  kubectl apply -f $DIR/manifests/rook-operator.yaml
+  kubectl apply -f $DIR/manifests/rook-operator.yaml --request-timeout 0
   while true; do
-    kubectl apply -f $DIR/manifests/rook-cluster.yaml && break
+    kubectl apply -f $DIR/manifests/rook-cluster.yaml --request-timeout 0 && break
     sleep 3
   done
-  kubectl apply -f $DIR/manifests/rook-storageclass.yaml
-  kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator
+  kubectl apply -f $DIR/manifests/rook-storageclass.yaml --request-timeout 0
+  kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator --request-timeout 0
   printf "Waiting for Operator to register third party objects..."
   until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
   until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
   until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
   echo "done!"
 
-  kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter
-  kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics
-  kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml
-  kubectl --namespace monitoring apply -f $DIR/manifests/grafana
-  find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml -exec kubectl --namespace "monitoring" apply -f {} \;
-  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml
-  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml
-  kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/
-  cat $DIR/manifests/prometheus-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --validate=false -f -
+  kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter --request-timeout 0
+  kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics --request-timeout 0
+  kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml --request-timeout 0
+  kubectl --namespace monitoring apply -f $DIR/manifests/grafana --request-timeout 0
+  find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \;
+  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0
+  kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0
+  kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/ --request-timeout 0
+  cat $DIR/manifests/prometheus-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f -
 
   echo "provisioned worker"
 }
@@ -509,7 +509,7 @@ update_domain() {
 }
 
 create_domain() {
-  linode_api domain.create DomainID=$DOMAIN_ID Domain="$DOMAIN" TTL_sec=300 axfr_ips="none" Expire_sec=604800 \
+  linode_api domain.create Domain="$DOMAIN" TTL_sec=300 axfr_ips="none" Expire_sec=604800 \
                            SOA_Email="$EMAIL" Retry_sec=300 status=1 Refresh_sec=300 Type=master >/dev/null
 }
 
