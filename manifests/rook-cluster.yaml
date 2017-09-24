@@ -11,6 +11,8 @@ metadata:
 spec:
   versionTag: master
   dataDirHostPath:
+  # toggle to use hostNetwork
+  hostNetwork: false
 # To control where various services will be scheduled by kubernetes, use the placement configuration sections below.
 # The example under 'all' would have all services scheduled on kubernetes nodes labeled with 'role=storage' and
 # tolerate taints with a key of 'storage-node'.
@@ -24,27 +26,35 @@ spec:
 #              operator: In
 #              values:
 #              - storage-node
+#      podAffinity:
+#      podAntiAffinity:
 #      tolerations:
 #      - key: storage-node
 #        operator: Exists
 #    api:
 #      nodeAffinity:
+#      podAffinity:
+#      podAntiAffinity:
 #      tolerations:
-#    mds:
+#    mgr:
 #      nodeAffinity:
+#      podAffinity:
+#      podAntiAffinity:
 #      tolerations:
 #    mon:
 #      nodeAffinity:
+#      podAffinity:
+#      podAntiAffinity:
 #      tolerations:
 #    osd:
 #      nodeAffinity:
-#      tolerations:
-#    rgw:
-#      nodeAffinity:
+#      podAffinity:
+#      podAntiAffinity:
 #      tolerations:
   storage:                # cluster level storage configuration and selection
     useAllNodes: true
-    useAllDevices: true
+    useAllDevices: false
+    deviceFilter:
     metadataDevice:
     location:
     storeConfig:
