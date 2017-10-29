@@ -5,5 +5,5 @@ metadata:
   labels:
     alertmanager: "main"
 spec:
-  replicas: 3
+  replicas: 1
   version: v0.7.1
