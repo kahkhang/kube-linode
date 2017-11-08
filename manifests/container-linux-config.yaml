@@ -25,7 +25,7 @@ storage:
           set -euo pipefail
 
           CLUSTER_DIR=${CLUSTER_DIR:-cluster}
-          SELF_HOST_ETCD=${SELF_HOST_ETCD:-true}
+          SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
           CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
           NETWORK_PROVIDER=${NETWORK_PROVIDER:-flannel}
 
@@ -33,6 +33,36 @@ storage:
               echo "USAGE:"
               echo "$0: <remote-host>"
               exit 1
+          }
+
+          function configure_etcd() {
+              [ -f "/etc/systemd/system/etcd-member.service.d/10-etcd-member.conf" ] || {
+                  mkdir -p /etc/etcd/tls
+                  cp /home/core/assets/tls/etcd-* /etc/etcd/tls
+                  mkdir -p /etc/etcd/tls/etcd
+                  cp /home/core/assets/tls/etcd/* /etc/etcd/tls/etcd
+                  chown -R etcd:etcd /etc/etcd
+                  chmod -R u=rX,g=,o= /etc/etcd
+                  mkdir -p /etc/systemd/system/etcd-member.service.d
+                  cat << EOF > /etc/systemd/system/etcd-member.service.d/10-etcd-member.conf
+          [Service]
+          Environment="ETCD_IMAGE_TAG=v3.1.8"
+          Environment="ETCD_NAME=controller"
+          Environment="ETCD_INITIAL_CLUSTER=controller=https://${COREOS_PRIVATE_IPV4}:2380"
+          Environment="ETCD_INITIAL_ADVERTISE_PEER_URLS=https://${COREOS_PRIVATE_IPV4}:2380"
+          Environment="ETCD_ADVERTISE_CLIENT_URLS=https://${COREOS_PRIVATE_IPV4}:2379"
+          Environment="ETCD_LISTEN_CLIENT_URLS=https://0.0.0.0:2379"
+          Environment="ETCD_LISTEN_PEER_URLS=https://0.0.0.0:2380"
+          Environment="ETCD_SSL_DIR=/etc/etcd/tls"
+          Environment="ETCD_TRUSTED_CA_FILE=/etc/ssl/certs/etcd/server-ca.crt"
+          Environment="ETCD_CERT_FILE=/etc/ssl/certs/etcd/server.crt"
+          Environment="ETCD_KEY_FILE=/etc/ssl/certs/etcd/server.key"
+          Environment="ETCD_CLIENT_CERT_AUTH=true"
+          Environment="ETCD_PEER_TRUSTED_CA_FILE=/etc/ssl/certs/etcd/peer-ca.crt"
+          Environment="ETCD_PEER_CERT_FILE=/etc/ssl/certs/etcd/peer.crt"
+          Environment="ETCD_PEER_KEY_FILE=/etc/ssl/certs/etcd/peer.key"
+          EOF
+              }
           }
 
           # Initialize a Master node
