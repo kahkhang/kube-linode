@@ -285,7 +285,7 @@ EOF
 
 provision_master() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
-          "sudo ./bootstrap.sh" 2>/dev/null
+          "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
   [ -e $DIR/cluster ] && rm -rf $DIR/cluster
   mkdir $DIR/cluster
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/home/core/assets/* $DIR/cluster
@@ -306,7 +306,7 @@ provision_master() {
   kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth --request-timeout 0
   kubectl apply -f $DIR/manifests/heapster.yaml --validate=false --request-timeout 0
   cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f -
-  cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f -
+  #cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f -
   echo "provisioned master"
 }
 

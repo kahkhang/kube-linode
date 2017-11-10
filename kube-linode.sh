@@ -32,6 +32,7 @@ check_dep awk
 check_dep sed
 check_dep cat
 check_dep tr
+check_dep helm
 
 unset DATACENTER_ID
 unset MASTER_PLAN
