@@ -25,9 +25,9 @@ storage:
           set -euo pipefail
 
           CLUSTER_DIR=${CLUSTER_DIR:-cluster}
-          SELF_HOST_ETCD=${SELF_HOST_ETCD:-true}
-          CALICO_NETWORK_POLICY=${CALICO_NETWORK_POLICY:-false}
+          SELF_HOST_ETCD=${SELF_HOST_ETCD:-false}
           CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
+          NETWORK_PROVIDER=${NETWORK_PROVIDER:-flannel}
 
           function usage() {
               echo "USAGE:"
@@ -68,7 +68,7 @@ storage:
           # Initialize a Master node
           function init_master_node() {
               systemctl daemon-reload
-              systemctl stop update-engine; systemctl mask update-engine
+              systemctl stop locksmithd; systemctl mask locksmithd
 
               if [ "$SELF_HOST_ETCD" = true ] ; then
                   echo "WARNING: THIS IS NOT YET FULLY WORKING - merely here to make ongoing testing easier"
@@ -77,15 +77,16 @@ storage:
                   etcd_render_flags="--etcd-servers=https://${COREOS_PRIVATE_IPV4}:2379"
               fi
 
-              if [ "$CALICO_NETWORK_POLICY" = true ]; then
-                  echo "WARNING: THIS IS EXPERIMENTAL SUPPORT FOR NETWORK POLICY"
-                  cnp_render_flags="--experimental-calico-network-policy"
+              if [ "$NETWORK_PROVIDER" = "canal" ]; then
+                  network_provider_flags="--network-provider=experimental-canal"
+              elif [ "$NETWORK_PROVIDER" = "calico" ]; then
+                  network_provider_flags="--network-provider=experimental-calico"
               else
-                  cnp_render_flags=""
+                  network_provider_flags="--network-provider=flannel"
               fi
 
               # Render cluster assets
-              /home/core/bootkube render --asset-dir=/home/core/assets ${etcd_render_flags} ${cnp_render_flags} \
+              /home/core/bootkube render --asset-dir=/home/core/assets ${etcd_render_flags} ${network_provider_flags} \
                 --api-servers=https://${COREOS_PUBLIC_IPV4}:6443,https://${COREOS_PRIVATE_IPV4}:6443
 
               # Move the local kubeconfig into expected location
@@ -115,9 +116,17 @@ storage:
               exit 1
           }
 
-          wget -P /home/core https://github.com/kahkhang/kube-linode/raw/master/bootkube.tar.gz
+          wget -P /home/core https://github.com/kubernetes-incubator/bootkube/releases/download/v0.8.1/bootkube.tar.gz
           tar -xzvf /home/core/bootkube.tar.gz -C /home/core
+          mv /home/core/bin/linux/bootkube .
           chmod +x /home/core/bootkube
+          rm -rf /home/core/bin
+
+          mkdir -p /opt/bin >/dev/null 2>/dev/null
+          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd >/dev/null 2>/dev/null
+          chmod +x /opt/bin/rbd >/dev/null 2>/dev/null
+          /opt/bin/rbd >/dev/null 2>/dev/null
+
           init_master_node
       mode: 0700
 networkd:
@@ -141,13 +150,18 @@ systemd:
       enable: true
       contents: |
         [Service]
-        Environment=KUBELET_IMAGE_URL=quay.io/coreos/hyperkube
-        Environment=KUBELET_IMAGE_TAG=v1.7.1_coreos.0
+        Environment=KUBELET_IMAGE_URL=docker://gcr.io/google_containers/hyperkube
+        Environment=KUBELET_IMAGE_TAG=v1.8.2
+        Environment=PATH=/opt/bin/:/usr/bin/:/usr/sbin:$PATH
         Environment="RKT_RUN_ARGS=\
         --uuid-file-save=/var/cache/kubelet-pod.uuid \
         --volume etc-resolv,kind=host,source=/etc/resolv.conf --mount volume=etc-resolv,target=/etc/resolv.conf \
         --volume opt-cni-bin,kind=host,source=/opt/cni/bin --mount volume=opt-cni-bin,target=/opt/cni/bin \
-        --volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log"
+        --volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log \
+        --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni \
+        --volume modprobe,kind=host,source=/usr/sbin/modprobe --mount volume=modprobe,target=/usr/sbin/modprobe \
+        --volume lib-modules,kind=host,source=/lib/modules --mount volume=lib-modules,target=/lib/modules \
+        --insecure-options=image"
         EnvironmentFile=/etc/environment
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /opt/cni/bin
@@ -155,6 +169,8 @@ systemd:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/inactive-manifests
         ExecStartPre=/bin/mkdir -p /var/lib/cni
+        ExecStartPre=/usr/bin/mkdir -p /opt/bin
+        ExecStartPre=/bin/mkdir -p /var/lib/kubelet/volumeplugins
         ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/cache/kubelet-pod.uuid
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --allow-privileged \
@@ -173,7 +189,8 @@ systemd:
           --node-labels=node-role.kubernetes.io/master \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --register-with-taints=node-role.kubernetes.io/master=:NoSchedule \
-          --require-kubeconfig
+          --require-kubeconfig \
+          --volume-plugin-dir=/var/lib/kubelet/volumeplugins
         ExecStop=-/usr/bin/rkt stop --uuid-file=/var/cache/kubelet-pod.uuid
         Restart=always
         RestartSec=5
