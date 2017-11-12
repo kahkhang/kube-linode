@@ -152,6 +152,8 @@ systemd:
         --volume opt-cni-bin,kind=host,source=/opt/cni/bin --mount volume=opt-cni-bin,target=/opt/cni/bin \
         --volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log \
         --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni \
+        --volume modprobe,kind=host,source=/usr/sbin/modprobe --mount volume=modprobe,target=/usr/sbin/modprobe \
+        --volume lib-modules,kind=host,source=/lib/modules --mount volume=lib-modules,target=/lib/modules \
         --insecure-options=image"
         EnvironmentFile=/etc/environment
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
