@@ -43,13 +43,5 @@ OSX: ``` brew install jq openssl curl kubectl ```
 
 Arch Linux: Follow the instructions [here](https://github.com/kahkhang/kube-linode/issues/4#issuecomment-311601422)
 
-
-### High Availability Setup
-1. Convert a worker node to a master node:
-```
-kubectl label node $IP "node-role.kubernetes.io/master="
-```
-2. Scale the etcd operator
-
 ### Acknowledgements
 This script uses [Bootkube](https://github.com/kubernetes-incubator/bootkube) to bootstrap the initial cluster using [Linode's API](https://www.linode.com/api).
