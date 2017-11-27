@@ -400,8 +400,8 @@ read_master_plan() {
       while ! [[ $MASTER_PLAN =~ ^-?[0-9]+$ ]] 2>/dev/null; do
          IFS=$'\n'
          spinner "Retrieving plans" get_plans plan_data
-         local plan_ids=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | .PLANID'))
-         local plan_list=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | [.RAM, .PRICE] | @csv' | \
+         local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
+         local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
            awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' 2>/dev/null))
          list_input_index "Select a master plan (https://www.linode.com/pricing)" plan_list selected_disk_id
 
