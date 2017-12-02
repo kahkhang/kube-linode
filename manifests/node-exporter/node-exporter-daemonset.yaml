@@ -42,4 +42,9 @@ spec:
       - name: sys
         hostPath:
           path: /sys
-
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule

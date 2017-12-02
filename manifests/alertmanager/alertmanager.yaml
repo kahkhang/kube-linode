@@ -7,3 +7,9 @@ metadata:
 spec:
   replicas: 1
   version: v0.9.1
+  # tolerations:
+  # - key: CriticalAddonsOnly
+  #   operator: Exists
+  # - key: node-role.kubernetes.io/master
+  #   operator: Exists
+  #   effect: NoSchedule

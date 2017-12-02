@@ -23,4 +23,9 @@ spec:
           limits:
             memory: 200Mi
             cpu: 200m
-
+      # tolerations:
+      # - key: CriticalAddonsOnly
+      #   operator: Exists
+      # - key: node-role.kubernetes.io/master
+      #   operator: Exists
+      #   effect: NoSchedule

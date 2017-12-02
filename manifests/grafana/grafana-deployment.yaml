@@ -72,3 +72,9 @@ spec:
       - name: grafana-dashboards
         configMap:
           name: grafana-dashboards
+      # tolerations:
+      # - key: CriticalAddonsOnly
+      #   operator: Exists
+      # - key: node-role.kubernetes.io/master
+      #   operator: Exists
+      #   effect: NoSchedule

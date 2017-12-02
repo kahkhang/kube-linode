@@ -113,3 +113,21 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: traefik-ingress
+  namespace: kube-system
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    ingress.kubernetes.io/auth-type: "basic"
+    ingress.kubernetes.io/auth-secret: "kubesecret"
+spec:
+  rules:
+    - host: traefik.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: traefik-console
+              servicePort: web

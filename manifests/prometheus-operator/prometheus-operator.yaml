@@ -28,3 +28,9 @@ spec:
             cpu: 100m
             memory: 50Mi
       serviceAccountName: prometheus-operator
+      # tolerations:
+      # - key: CriticalAddonsOnly
+      #   operator: Exists
+      # - key: node-role.kubernetes.io/master
+      #   operator: Exists
+      #   effect: NoSchedule

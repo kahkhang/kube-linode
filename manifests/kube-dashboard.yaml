@@ -63,12 +63,6 @@ spec:
           - backend:
               serviceName: kubernetes-dashboard
               servicePort: 80
-    - host: traefik.${DOMAIN}
-      http:
-        paths:
-          - backend:
-              serviceName: traefik-console
-              servicePort: web
 ---
 apiVersion: v1
 kind: Service

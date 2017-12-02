@@ -118,7 +118,7 @@ spec:
       serviceAccountName: rook-operator
       containers:
       - name: rook-operator
-        image: rook/rook:master
+        image: rook/rook:v0.6.0
         args: ["operator"]
         env:
         - name: FLEXVOLUME_DIR_PATH
@@ -144,3 +144,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+      # tolerations:
+      # - key: CriticalAddonsOnly
+      #   operator: Exists
+      # - key: node-role.kubernetes.io/master
+      #   operator: Exists
+      #   effect: NoSchedule
