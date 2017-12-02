@@ -41,6 +41,7 @@ unset EMAIL
 unset MASTER_ID
 unset API_KEY
 unset USERNAME
+unset NO_OF_WORKERS
 
 stty -echo
 tput civis
