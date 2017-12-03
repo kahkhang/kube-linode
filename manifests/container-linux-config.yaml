@@ -122,11 +122,6 @@ storage:
           chmod +x /home/core/bootkube
           rm -rf /home/core/bin
 
-          mkdir -p /opt/bin >/dev/null 2>/dev/null
-          wget -P /opt/bin https://raw.githubusercontent.com/ceph/ceph-docker/master/examples/kubernetes-coreos/rbd >/dev/null 2>/dev/null
-          chmod +x /opt/bin/rbd >/dev/null 2>/dev/null
-          /opt/bin/rbd >/dev/null 2>/dev/null
-
           init_master_node
       mode: 0700
 networkd:
@@ -159,8 +154,6 @@ systemd:
         --volume opt-cni-bin,kind=host,source=/opt/cni/bin --mount volume=opt-cni-bin,target=/opt/cni/bin \
         --volume var-log,kind=host,source=/var/log --mount volume=var-log,target=/var/log \
         --volume var-lib-cni,kind=host,source=/var/lib/cni --mount volume=var-lib-cni,target=/var/lib/cni \
-        --volume modprobe,kind=host,source=/usr/sbin/modprobe --mount volume=modprobe,target=/usr/sbin/modprobe \
-        --volume lib-modules,kind=host,source=/lib/modules --mount volume=lib-modules,target=/lib/modules \
         --insecure-options=image"
         EnvironmentFile=/etc/environment
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
@@ -169,7 +162,6 @@ systemd:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/inactive-manifests
         ExecStartPre=/bin/mkdir -p /var/lib/cni
-        ExecStartPre=/usr/bin/mkdir -p /opt/bin
         ExecStartPre=/bin/mkdir -p /var/lib/kubelet/volumeplugins
         ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/cache/kubelet-pod.uuid
         ExecStart=/usr/lib/coreos/kubelet-wrapper \

@@ -290,12 +290,10 @@ provision_master() {
   mkdir $DIR/cluster
   scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/home/core/assets/* $DIR/cluster
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/bootstrap.sh"
-
   mkdir -p $HOME/.kube
   if [ -e $HOME/.kube/config ]; then
     yes | cp $HOME/.kube/config $HOME/.kube/config.bak
   fi
-
   yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
   while true; do kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth --request-timeout 0 && break || sleep 5; done
   if kubectl --request-timeout 0 get namespaces | grep -q "monitoring"; then
@@ -315,23 +313,37 @@ provision_worker() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
   set +e
-  while true; do kubectl apply -f $DIR/manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl apply -f $DIR/manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl apply -f $DIR/manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
-  printf "Waiting for Operator to register third party objects..."
-  until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
-  until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
-  until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
-  while true; do kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana --request-timeout 0 && break || sleep 5; done
-  while true; do find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
-  while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
-  while true; do cat $DIR/manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+  until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
+  if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
+    if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
+      if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
+        while true; do kubectl apply -f $DIR/manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl apply -f $DIR/manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl apply -f $DIR/manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
+      fi
+    fi
+  fi
+  until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
+  if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
+    if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
+      if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
+        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
+        printf "Waiting for Operator to register third party objects..."
+        until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
+        until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
+        until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
+        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana --request-timeout 0 && break || sleep 5; done
+        while true; do find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
+        while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
+        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
+        while true; do cat $DIR/manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+      fi
+    fi
+  fi
   set -e
   echo "provisioned worker"
 }
