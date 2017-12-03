@@ -1,3 +1,47 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: traefik-ingress-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-ingress-controller
+subjects:
+- kind: ServiceAccount
+  name: traefik-ingress-controller
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik-ingress-controller
+  namespace: kube-system
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -39,6 +83,7 @@ data:
   traefik.toml: |
     # traefik.toml
     defaultEntryPoints = ["http","https"]
+    InsecureSkipVerify = true
     [entryPoints]
       [entryPoints.http]
       address = ":80"
@@ -86,7 +131,7 @@ spec:
           hostPath:
             path: /etc/traefik/acme/acme.json
       containers:
-        - image: containous/traefik:experimental
+        - image: traefik
           name: traefik-ingress-lb
           imagePullPolicy: Always
           volumeMounts:
@@ -113,3 +158,21 @@ spec:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: traefik-ingress
+  namespace: kube-system
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    ingress.kubernetes.io/auth-type: "basic"
+    ingress.kubernetes.io/auth-secret: "kubesecret"
+spec:
+  rules:
+    - host: traefik.${DOMAIN}
+      http:
+        paths:
+          - backend:
+              serviceName: traefik-console
+              servicePort: web
