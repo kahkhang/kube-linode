@@ -457,9 +457,10 @@ read_datacenter() {
 }
 
 read_domain() {
-  if ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; then
-      while ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; do
-         text_input "Enter Domain Name: " DOMAIN "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$" "Please enter a valid domain name"
+  domain_regex="^([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.)+[a-zA-Z]{2,}$"
+  if ! [[ $DOMAIN =~ $domain_regex ]] 2>/dev/null; then
+      while ! [[ $DOMAIN =~ $domain_regex ]] 2>/dev/null; do
+         text_input "Enter Domain Name: " DOMAIN "$domain_regex" "Please enter a valid domain name"
       done
       echo "DOMAIN=$DOMAIN" >> $DIR/settings.env
   fi
