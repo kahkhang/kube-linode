@@ -32,7 +32,6 @@ Just run `./kube-linode.sh` into your console, key in your configuration, then s
 Settings are stored in `settings.env`, or you can pass them in as key-value flags as such:
 
 ```sh
-
 ./kube-linode.sh --no_of_workers=3 --api_key=12345
 ```
 
