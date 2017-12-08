@@ -60,6 +60,23 @@ read_email
 read_no_of_workers
 read_username
 
+# -- command line argument overrides --
+options=$@
+
+for argument in $options
+  do
+    case $argument in
+      --datacenter_id=*) DATACENTER_ID=${argument/*=/""} ;;
+      --master_plan=*)   MASTER_PLAN=${argument/*=/""} ;;
+      --worker_plan=*)   WORKER_PLAN=${argument/*=/""} ;;
+      --domain=*)        DOMAIN=${argument/*=/""} ;;
+      --email=*)         EMAIL=${argument/*=/""} ;;
+      --master_id=*)     MASTER_ID=${argument/*=/""} ;;
+      --api_key=*)       API_KEY=${argument/*=/""} ;;
+      --username=*)      USERNAME=${argument/*=/""} ;;
+    esac
+  done
+
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""
 else
