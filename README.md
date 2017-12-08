@@ -29,7 +29,11 @@ chmod +x kube-linode.sh
 
 Just run `./kube-linode.sh` into your console, key in your configuration, then sit back and have a :coffee:!
 
-Settings are stored in `settings.env`.
+Settings are stored in `settings.env`, or you can pass them in as key-value flags as such:
+
+```sh
+./kube-linode.sh --no_of_workers=3 --api_key=12345
+```
 
 To increase the number of workers, modify `NO_OF_WORKERS` in `settings.env` as desired and run `./kube-linode.sh` again.
 
