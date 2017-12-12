@@ -33,6 +33,37 @@ check_dep sed
 check_dep cat
 check_dep tr
 
+if [ $1 == "kill" ]; then
+  MASTER_ID=$(get_master_id)
+  WORKER_IDS=$(list_worker_ids)
+
+  if [ -z ${MASTER_ID+x} ]; then
+    exit "No Master node found!"
+  fi
+
+  read -r -p "Are you sure you want to delete the local cluster? [y/N] " response
+  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]
+  then
+    for WORKER_ID in $WORKER_IDS; do
+      spinner \
+        "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" \
+        "delete_linode $WORKER_ID"
+    done
+
+    spinner \
+      "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" \
+      "delete_linode $MASTER_ID"
+
+    rm -rf $DIR/cluster
+
+    spinner \
+      "Removing cluster..." \
+      "kubectl config unset clusters.local"
+  fi
+
+  exit 0
+fi
+
 unset DATACENTER_ID
 unset MASTER_PLAN
 unset WORKER_PLAN

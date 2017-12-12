@@ -567,6 +567,17 @@ create_linode() {
   linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$PLAN_ID | jq ".DATA.LinodeID"
 }
 
+delete_linode() {
+  local LINODE_ID=$1
+  local DISK_ID=$(get_disk_ids $LINODE_ID)
+
+  for disk in "$DISK_ID" ; do
+    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$disk
+  done
+
+  linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true
+}
+
 add_private_ip() {
   local LINODE_ID=$1
   linode_api linode.ip.addprivate LinodeID=$LINODE_ID
