@@ -82,7 +82,7 @@ shutdown() {
 }
 
 get_disk_ids() {
-  local LINODE_ID=$1
+  local LINODE_ID="$1"
   linode_api linode.disk.list LinodeID=$LINODE_ID | jq ".DATA" | jq -c ".[] | .DISKID"
 }
 
@@ -522,6 +522,10 @@ create_domain() {
                            SOA_Email="$EMAIL" Retry_sec=300 status=1 Refresh_sec=300 Type=master >/dev/null
 }
 
+delete_domain() {
+  linode_api domain.delete DomainID="$DOMAIN_ID" Domain="$DOMAIN" #>/dev/null
+}
+
 update_dns() {
   local LINODE_ID=$1
   local DOMAIN_ID
@@ -568,14 +572,14 @@ create_linode() {
 }
 
 delete_linode() {
-  local LINODE_ID=$1
-  local DISK_ID=$(get_disk_ids $LINODE_ID)
+  local LINODE_ID="$1"
+  local DISK_IDS=$(get_disk_ids $LINODE_ID)
 
-  for disk in "$DISK_ID" ; do
-    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$disk
+  for DISK_ID in "$DISK_IDS" ; do
+    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID #>/dev/null
   done
 
-  linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true
+  linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true #>/dev/null
 }
 
 add_private_ip() {

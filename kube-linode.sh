@@ -33,37 +33,6 @@ check_dep sed
 check_dep cat
 check_dep tr
 
-if [ $1 == "kill" ]; then
-  MASTER_ID=$(get_master_id)
-  WORKER_IDS=$(list_worker_ids)
-
-  if [ -z ${MASTER_ID+x} ]; then
-    exit "No Master node found!"
-  fi
-
-  read -r -p "Are you sure you want to delete the local cluster? [y/N] " response
-  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]
-  then
-    for WORKER_ID in $WORKER_IDS; do
-      spinner \
-        "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" \
-        "delete_linode $WORKER_ID"
-    done
-
-    spinner \
-      "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" \
-      "delete_linode $MASTER_ID"
-
-    rm -rf $DIR/cluster
-
-    spinner \
-      "Removing cluster..." \
-      "kubectl config unset clusters.local"
-  fi
-
-  exit 0
-fi
-
 unset DATACENTER_ID
 unset MASTER_PLAN
 unset WORKER_PLAN
@@ -108,6 +77,44 @@ for argument in $options
       --username=*)      USERNAME=${argument/*=/""} ;;
     esac
   done
+
+if [ "$1" == "kill" ]; then
+  spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
+
+  if [ -z "$MASTER_ID" ]; then
+    exit "No Master node found!"
+  fi
+
+  spinner "Retrieving worker linodes (if any)" list_worker_ids WORKER_IDS
+
+  if [ -z "$WORKER_IDS" ]; then
+    exit "No Worker node found!"
+  fi
+
+  read -r -p "Are you sure you want to delete the local cluster? [y/N]" response
+  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]; then
+
+    for WORKER_ID in $WORKER_IDS; do
+      spinner \
+        "${CYAN}[$WORKER_ID]${NORMAL} 'Deleting' worker" \
+        "delete_linode $WORKER_ID"
+    done
+
+    spinner \
+      "${CYAN}[$MASTER_ID]${NORMAL} 'Deleting' master" \
+      "delete_linode $MASTER_ID"
+ 
+    spinner \
+      "Deleting domain..." \
+      delete_domain
+
+    spinner \
+      "Sweeping up unneeded files..." \
+      "rm -rf $DIR/cluster && rm -rf $HOME/.kube && rm $DIR/auth"
+  fi
+
+  exit 0
+fi
 
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""
