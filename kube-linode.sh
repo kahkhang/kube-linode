@@ -52,15 +52,6 @@ else
     touch $DIR/settings.env
 fi
 
-read_api_key
-read_datacenter
-read_master_plan
-read_worker_plan
-read_domain
-read_email
-read_no_of_workers
-read_username
-
 # -- command line argument overrides --
 options=$@
 
@@ -70,6 +61,7 @@ for argument in $options
       --datacenter_id=*) DATACENTER_ID=${argument/*=/""} ;;
       --master_plan=*)   MASTER_PLAN=${argument/*=/""} ;;
       --worker_plan=*)   WORKER_PLAN=${argument/*=/""} ;;
+      --no_of_workers=*)   NO_OF_WORKERS=${argument/*=/""} ;;
       --domain=*)        DOMAIN=${argument/*=/""} ;;
       --email=*)         EMAIL=${argument/*=/""} ;;
       --master_id=*)     MASTER_ID=${argument/*=/""} ;;
@@ -77,6 +69,15 @@ for argument in $options
       --username=*)      USERNAME=${argument/*=/""} ;;
     esac
   done
+
+read_api_key
+read_datacenter
+read_master_plan
+read_worker_plan
+read_domain
+read_email
+read_no_of_workers
+read_username
 
 if [ "$1" == "teardown" ]; then
   spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
