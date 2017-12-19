@@ -82,7 +82,7 @@ shutdown() {
 }
 
 get_disk_ids() {
-  local LINODE_ID="$1"
+  local LINODE_ID=$1
   linode_api linode.disk.list LinodeID=$LINODE_ID | jq ".DATA" | jq -c ".[] | .DISKID"
 }
 
