@@ -523,7 +523,7 @@ create_domain() {
 }
 
 delete_domain() {
-  linode_api domain.delete DomainID="$DOMAIN_ID" Domain="$DOMAIN" #>/dev/null
+  linode_api domain.delete DomainID="$DOMAIN_ID" Domain="$DOMAIN" >/dev/null
 }
 
 update_dns() {
@@ -576,10 +576,10 @@ delete_linode() {
   local DISK_IDS=$(get_disk_ids $LINODE_ID)
 
   for DISK_ID in "$DISK_IDS" ; do
-    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID #>/dev/null
+    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID >/dev/null
   done
 
-  linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true #>/dev/null
+  linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true >/dev/null
 }
 
 add_private_ip() {
