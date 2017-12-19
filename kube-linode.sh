@@ -78,7 +78,7 @@ for argument in $options
     esac
   done
 
-if [ "$1" == "kill" ]; then
+if [ "$1" == "teardown" ]; then
   spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
 
   if [ -z "$MASTER_ID" ]; then
@@ -91,26 +91,27 @@ if [ "$1" == "kill" ]; then
     exit "No Worker node found!"
   fi
 
-  read -r -p "Are you sure you want to delete the local cluster? [y/N]" response
-  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]; then
+  text_input "Are you sure you want to delete the local cluster? [y/N]" response
 
+  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]; then
+    # TODO: gracefully shutdown
     for WORKER_ID in $WORKER_IDS; do
       spinner \
-        "${CYAN}[$WORKER_ID]${NORMAL} 'Deleting' worker" \
+        "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" \
         "delete_linode $WORKER_ID"
     done
 
     spinner \
-      "${CYAN}[$MASTER_ID]${NORMAL} 'Deleting' master" \
+      "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" \
       "delete_linode $MASTER_ID"
  
     spinner \
-      "Deleting domain..." \
-      delete_domain
+      "Deleting domain..." delete_domain
 
-    spinner \
-      "Sweeping up unneeded files..." \
-      "rm -rf $DIR/cluster && rm -rf $HOME/.kube && rm $DIR/auth"
+    rm -rf $DIR/cluster
+    rm -rf $HOME/.kube 
+    rm $DIR/auth
+    rm $DIR/settings.env
   fi
 
   exit 0

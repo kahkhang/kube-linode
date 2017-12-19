@@ -39,6 +39,16 @@ To increase the number of workers, modify `NO_OF_WORKERS` in `settings.env` as d
 
 Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)
 
+<hr>
+
+Later, should you want to start over from scratch, or if you just want to stop everything, you can run 
+
+```sh
+./kube-linode.sh teardown
+```
+
+And all your linodes - everything - will be deleted.
+
 ### Dependencies
 You should have a Linode account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).
 You should also have an API Key with a valid domain that uses [Linode's DNS servers](https://www.linode.com/docs/networking/dns/dns-manager-overview#set-domain-names-to-use-linodes-name-servers).
