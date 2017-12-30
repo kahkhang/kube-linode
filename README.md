@@ -29,11 +29,25 @@ chmod +x kube-linode.sh
 
 Just run `./kube-linode.sh` into your console, key in your configuration, then sit back and have a :coffee:!
 
-Settings are stored in `settings.env`.
+Settings are stored in `settings.env`, or you can pass them in as key-value flags as such:
+
+```sh
+./kube-linode.sh --no_of_workers=3 --api_key=12345
+```
 
 To increase the number of workers, modify `NO_OF_WORKERS` in `settings.env` as desired and run `./kube-linode.sh` again.
 
 Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)
+
+<hr>
+
+Later, should you want to start over from scratch, or if you just want to stop everything, you can run 
+
+```sh
+./kube-linode.sh teardown
+```
+
+And all your linodes - everything - will be deleted.
 
 ### Dependencies
 You should have a Linode account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).

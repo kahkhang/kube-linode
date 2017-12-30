@@ -52,6 +52,24 @@ else
     touch $DIR/settings.env
 fi
 
+# -- command line argument overrides --
+options=$@
+
+for argument in $options
+  do
+    case $argument in
+      --datacenter_id=*) DATACENTER_ID=${argument/*=/""} ;;
+      --master_plan=*)   MASTER_PLAN=${argument/*=/""} ;;
+      --worker_plan=*)   WORKER_PLAN=${argument/*=/""} ;;
+      --no_of_workers=*)   NO_OF_WORKERS=${argument/*=/""} ;;
+      --domain=*)        DOMAIN=${argument/*=/""} ;;
+      --email=*)         EMAIL=${argument/*=/""} ;;
+      --master_id=*)     MASTER_ID=${argument/*=/""} ;;
+      --api_key=*)       API_KEY=${argument/*=/""} ;;
+      --username=*)      USERNAME=${argument/*=/""} ;;
+    esac
+  done
+
 read_api_key
 read_datacenter
 read_master_plan
@@ -60,6 +78,45 @@ read_domain
 read_email
 read_no_of_workers
 read_username
+
+if [ "$1" == "teardown" ]; then
+  spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
+
+  if [ -z "$MASTER_ID" ]; then
+    exit "No Master node found!"
+  fi
+
+  spinner "Retrieving worker linodes (if any)" list_worker_ids WORKER_IDS
+
+  if [ -z "$WORKER_IDS" ]; then
+    exit "No Worker node found!"
+  fi
+
+  text_input "Are you sure you want to delete the local cluster? [y/N]" response
+
+  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]; then
+    # TODO: gracefully shutdown
+    for WORKER_ID in $WORKER_IDS; do
+      spinner \
+        "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" \
+        "delete_linode $WORKER_ID"
+    done
+
+    spinner \
+      "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" \
+      "delete_linode $MASTER_ID"
+ 
+    spinner \
+      "Deleting domain..." delete_domain
+
+    rm -rf $DIR/cluster
+    rm -rf $HOME/.kube 
+    rm $DIR/auth
+    rm $DIR/settings.env
+  fi
+
+  exit 0
+fi
 
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""

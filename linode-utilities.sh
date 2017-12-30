@@ -457,9 +457,10 @@ read_datacenter() {
 }
 
 read_domain() {
-  if ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; then
-      while ! [[ $DOMAIN =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]] 2>/dev/null; do
-         text_input "Enter Domain Name: " DOMAIN "^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$" "Please enter a valid domain name"
+  domain_regex="^([a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.)+[a-zA-Z]{2,}$"
+  if ! [[ $DOMAIN =~ $domain_regex ]] 2>/dev/null; then
+      while ! [[ $DOMAIN =~ $domain_regex ]] 2>/dev/null; do
+         text_input "Enter Domain Name: " DOMAIN "$domain_regex" "Please enter a valid domain name"
       done
       echo "DOMAIN=$DOMAIN" >> $DIR/settings.env
   fi
@@ -521,6 +522,10 @@ create_domain() {
                            SOA_Email="$EMAIL" Retry_sec=300 status=1 Refresh_sec=300 Type=master >/dev/null
 }
 
+delete_domain() {
+  linode_api domain.delete DomainID="$DOMAIN_ID" Domain="$DOMAIN" >/dev/null
+}
+
 update_dns() {
   local LINODE_ID=$1
   local DOMAIN_ID
@@ -564,6 +569,17 @@ create_linode() {
   DATACENTER_ID=$1
   PLAN_ID=$2
   linode_api linode.create DatacenterID=$DATACENTER_ID PlanID=$PLAN_ID | jq ".DATA.LinodeID"
+}
+
+delete_linode() {
+  local LINODE_ID="$1"
+  local DISK_IDS=$(get_disk_ids $LINODE_ID)
+
+  for DISK_ID in "$DISK_IDS" ; do
+    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID >/dev/null
+  done
+
+  linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true >/dev/null
 }
 
 add_private_ip() {
