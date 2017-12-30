@@ -80,6 +80,27 @@ join() {
   done
 }
 
+function gen_env_from_options() {
+  local IFS=$'\n'
+  local _indices
+  local _env_names
+  local _checkbox_selected
+  eval _indices=( '"${'${1}'[@]}"' )
+  eval _env_names=( '"${'${2}'[@]}"' )
+
+  for i in $(gen_index ${#_env_names[@]}); do
+    _checkbox_selected[$i]=false
+  done
+
+  for i in ${_indices[@]}; do
+    _checkbox_selected[$i]=true
+  done
+
+  for i in $(gen_index ${#_env_names[@]}); do
+    printf "%s=%s\n" "${_env_names[$i]}" "${_checkbox_selected[$i]}"
+  done
+}
+
 on_default() {
   true;
 }
@@ -303,6 +324,12 @@ _checkbox_input() {
   for i in $(gen_index ${#_checkbox_list[@]}); do
     _checkbox_selected[$i]=false
   done
+
+  eval _selected_indices=( '"${'${3}'[@]}"' )
+  for i in ${_selected_indices[@]}; do
+    _checkbox_selected[$i]=true
+  done
+
   for i in $(gen_index ${#_checkbox_list[@]}); do
     tput cub "$(tput cols)"
     if [ $i = 0 ]; then
@@ -342,7 +369,7 @@ checkbox_input() {
 }
 
 checkbox_input_indices() {
-  _checkbox_input "$1" "$2"
+  _checkbox_input "$1" "$2" "$3"
   _checkbox_input_output_var_name=$3
 
   eval $_checkbox_input_output_var_name\=\(\)

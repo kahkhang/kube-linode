@@ -41,7 +41,7 @@ Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)
 
 <hr>
 
-Later, should you want to start over from scratch, or if you just want to stop everything, you can run 
+Later, should you want to start over from scratch, or if you just want to stop everything, you can run
 
 ```sh
 ./kube-linode.sh teardown

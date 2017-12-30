@@ -303,8 +303,12 @@ provision_master() {
   fi
   while true; do kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth --request-timeout 0 && break || sleep 5; done
   while true; do kubectl apply -f $DIR/manifests/heapster.yaml --validate=false --request-timeout 0 && break || sleep 5; done
-  while true; do cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
-  while true; do cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+  if [ $INSTALL_K8S_DASHBOARD = true ]; then
+    while true; do cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+  fi
+  if [ $INSTALL_TRAEFIK = true ]; then
+    while true; do cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+  fi
   echo "provisioned master"
 }
 
@@ -314,36 +318,43 @@ provision_worker() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
   set +e
   until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
-  if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
+
+  if [ $INSTALL_ROOK = true ]; then
     if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
       if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
-        while true; do kubectl apply -f $DIR/manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl apply -f $DIR/manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl apply -f $DIR/manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
+        if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
+          while true; do kubectl apply -f $DIR/manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f $DIR/manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f $DIR/manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
+        fi
       fi
     fi
   fi
-  until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
-  if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
+
+  if [ $INSTALL_PROMETHEUS = true ]; then
+    until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
     if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
       if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
-        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
-        printf "Waiting for Operator to register third party objects..."
-        until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
-        until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
-        until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
-        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana --request-timeout 0 && break || sleep 5; done
-        while true; do find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
-        while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
-        while true; do kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
-        while true; do cat $DIR/manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+        if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
+          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
+          printf "Waiting for Operator to register third party objects..."
+          until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
+          until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
+          until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
+          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana --request-timeout 0 && break || sleep 5; done
+          while true; do find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
+          while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
+          while true; do cat $DIR/manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+        fi
       fi
     fi
   fi
+  
   set -e
   echo "provisioned worker"
 }
@@ -402,6 +413,22 @@ get_plans() {
   linode_api avail.linodeplans | jq ".DATA | sort_by(.PRICE)"
 }
 
+read_install_options() {
+  if [[ -z $INSTALL_K8S_DASHBOARD || -z $INSTALL_TRAEFIK || -z $INSTALL_ROOK || -z $INSTALL_PROMETHEUS ]]; then
+    options=('K8S Dashboard' 'Traefik (Load Balancer)' 'Rook (Distributed Storage)' 'Prometheus (Monitoring)')
+    env_names=('INSTALL_K8S_DASHBOARD' 'INSTALL_TRAEFIK' 'INSTALL_ROOK' 'INSTALL_PROMETHEUS')
+    selected_indices=(0 1 2 3)
+    checkbox_input_indices "What should be included in your cluster?" options selected_indices
+    eval "$(gen_env_from_options selected_indices env_names)"
+    sed -i.bak '/^INSTALL_K8S_DASHBOARD/d' $DIR/settings.env
+    sed -i.bak '/^INSTALL_TRAEFIK/d' $DIR/settings.env
+    sed -i.bak '/^INSTALL_ROOK/d' $DIR/settings.env
+    sed -i.bak '/^INSTALL_PROMETHEUS/d' $DIR/settings.env
+    echo "$(gen_env_from_options selected_indices env_names)" >> $DIR/settings.env
+    rm $DIR/settings.env.bak
+  fi
+}
+
 read_master_plan() {
   if ! [[ $MASTER_PLAN =~ ^[0-9]+$ ]] 2>/dev/null; then
       while ! [[ $MASTER_PLAN =~ ^-?[0-9]+$ ]] 2>/dev/null; do
@@ -416,7 +443,6 @@ read_master_plan() {
       done
       echo "MASTER_PLAN=$MASTER_PLAN" >> $DIR/settings.env
   fi
-
 }
 
 read_worker_plan() {

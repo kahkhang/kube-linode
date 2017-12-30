@@ -58,15 +58,19 @@ options=$@
 for argument in $options
   do
     case $argument in
-      --datacenter_id=*) DATACENTER_ID=${argument/*=/""} ;;
-      --master_plan=*)   MASTER_PLAN=${argument/*=/""} ;;
-      --worker_plan=*)   WORKER_PLAN=${argument/*=/""} ;;
-      --no_of_workers=*)   NO_OF_WORKERS=${argument/*=/""} ;;
-      --domain=*)        DOMAIN=${argument/*=/""} ;;
-      --email=*)         EMAIL=${argument/*=/""} ;;
-      --master_id=*)     MASTER_ID=${argument/*=/""} ;;
-      --api_key=*)       API_KEY=${argument/*=/""} ;;
-      --username=*)      USERNAME=${argument/*=/""} ;;
+      --datacenter_id=*)           DATACENTER_ID=${argument/*=/""} ;;
+      --master_plan=*)             MASTER_PLAN=${argument/*=/""} ;;
+      --worker_plan=*)             WORKER_PLAN=${argument/*=/""} ;;
+      --no_of_workers=*)           NO_OF_WORKERS=${argument/*=/""} ;;
+      --domain=*)                  DOMAIN=${argument/*=/""} ;;
+      --email=*)                   EMAIL=${argument/*=/""} ;;
+      --master_id=*)               MASTER_ID=${argument/*=/""} ;;
+      --api_key=*)                 API_KEY=${argument/*=/""} ;;
+      --username=*)                USERNAME=${argument/*=/""} ;;
+      --install_k8s_dashboard=*)   INSTALL_K8S_DASHBOARD=${argument/*=/""} ;;
+      --install_traefik=*)         INSTALL_TRAEFIK=${argument/*=/""} ;;
+      --install_rook=*)            INSTALL_ROOK=${argument/*=/""} ;;
+      --install_prometheus=*)      INSTALL_PROMETHEUS=${argument/*=/""} ;;
     esac
   done
 
@@ -78,6 +82,7 @@ read_domain
 read_email
 read_no_of_workers
 read_username
+read_install_options
 
 if [ "$1" == "teardown" ]; then
   spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
@@ -105,12 +110,12 @@ if [ "$1" == "teardown" ]; then
     spinner \
       "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" \
       "delete_linode $MASTER_ID"
- 
+
     spinner \
       "Deleting domain..." delete_domain
 
     rm -rf $DIR/cluster
-    rm -rf $HOME/.kube 
+    rm -rf $HOME/.kube
     rm $DIR/auth
     rm $DIR/settings.env
   fi
