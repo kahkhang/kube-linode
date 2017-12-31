@@ -10,7 +10,7 @@ Automatically provision a scalable CoreOS/Kubernetes cluster on Linode with zero
 The cluster will comprise of a single Kubernetes master host with a custom number of worker nodes.
 
 ### What's included
-* [Kubernetes 1.8.2](https://kubernetes.io/) with [Bootkube](https://github.com/kubernetes-incubator/bootkube)
+* [Kubernetes 1.8.5](https://kubernetes.io/) with [Bootkube](https://github.com/kubernetes-incubator/bootkube)
 * Load Balancer and automatic SSL/TLS renewal using [Traefik](https://github.com/containous/traefik)
 * Distributed block storage with [Rook](https://github.com/rook/rook)
 * Pre-configured [Grafana](https://github.com/grafana/grafana) dashboard using [Kube-Prometheus](https://github.com/coreos/prometheus-operator/tree/master/contrib/kube-prometheus) with Rook and Traefik monitoring
@@ -41,7 +41,7 @@ Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)
 
 <hr>
 
-Later, should you want to start over from scratch, or if you just want to stop everything, you can run 
+Later, should you want to start over from scratch, or if you just want to stop everything, you can run
 
 ```sh
 ./kube-linode.sh teardown
