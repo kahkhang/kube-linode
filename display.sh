@@ -325,10 +325,12 @@ _checkbox_input() {
     _checkbox_selected[$i]=false
   done
 
-  eval _selected_indices=( '"${'${3}'[@]}"' )
-  for i in ${_selected_indices[@]}; do
-    _checkbox_selected[$i]=true
-  done
+  if [ -n "$3" ]; then
+    eval _selected_indices=( '"${'${3}'[@]}"' )
+    for i in ${_selected_indices[@]}; do
+      _checkbox_selected[$i]=true
+    done
+  fi
 
   for i in $(gen_index ${#_checkbox_list[@]}); do
     tput cub "$(tput cols)"

@@ -116,7 +116,7 @@ storage:
               exit 1
           }
 
-          wget -P /home/core https://github.com/kubernetes-incubator/bootkube/releases/download/v0.8.1/bootkube.tar.gz
+          wget -P /home/core https://github.com/kubernetes-incubator/bootkube/releases/download/v0.9.1/bootkube.tar.gz
           tar -xzvf /home/core/bootkube.tar.gz -C /home/core
           mv /home/core/bin/linux/bootkube .
           chmod +x /home/core/bootkube
@@ -146,7 +146,7 @@ systemd:
       contents: |
         [Service]
         Environment=KUBELET_IMAGE_URL=docker://gcr.io/google_containers/hyperkube
-        Environment=KUBELET_IMAGE_TAG=v1.8.2
+        Environment=KUBELET_IMAGE_TAG=v1.8.5
         Environment=PATH=/opt/bin/:/usr/bin/:/usr/sbin:$PATH
         Environment="RKT_RUN_ARGS=\
         --uuid-file-save=/var/cache/kubelet-pod.uuid \
@@ -176,12 +176,10 @@ systemd:
           --hostname-override=${COREOS_PUBLIC_IPV4} \
           --kubeconfig=/etc/kubernetes/kubeconfig \
           --lock-file=/var/run/lock/kubelet.lock \
-          --minimum-container-ttl-duration=3m0s \
           --network-plugin=cni \
           --node-labels=node-role.kubernetes.io/master \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --register-with-taints=node-role.kubernetes.io/master=:NoSchedule \
-          --require-kubeconfig \
           --volume-plugin-dir=/var/lib/kubelet/volumeplugins \
           --feature-gates=AllAlpha=true
         ExecStop=-/usr/bin/rkt stop --uuid-file=/var/cache/kubelet-pod.uuid
@@ -190,4 +188,4 @@ systemd:
 
         [Install]
         WantedBy=multi-user.target
-#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\\\\n/\\n/g' | pbcopy
+#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\$PATH/\\$PATH/g' | sed 's/\\\\n/\\n/g' | pbcopy
