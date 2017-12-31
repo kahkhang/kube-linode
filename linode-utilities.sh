@@ -301,6 +301,11 @@ provision_master() {
   else
     while true; do kubectl create namespace "monitoring" --request-timeout 0 && break || sleep 5; done
   fi
+  if kubectl --request-timeout 0 get namespaces | grep -q "rook"; then
+    echo "namespace rook exists"
+  else
+    while true; do kubectl create namespace "rook" --request-timeout 0 && break || sleep 5; done
+  fi
   while true; do kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth --request-timeout 0 && break || sleep 5; done
   while true; do kubectl apply -f $DIR/manifests/heapster.yaml --validate=false --request-timeout 0 && break || sleep 5; done
   if [ $INSTALL_K8S_DASHBOARD = true ]; then
@@ -354,7 +359,7 @@ provision_worker() {
       fi
     fi
   fi
-  
+
   set -e
   echo "provisioned worker"
 }

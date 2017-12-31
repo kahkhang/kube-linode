@@ -100,7 +100,7 @@ systemd:
           --network-plugin=cni \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --volume-plugin-dir=/var/lib/kubelet/volumeplugins \
-          --feature-gates=AllAlpha=true
+          --feature-gates=PersistentLocalVolumes=true,MountPropagation=true
         ExecStop=-/usr/bin/rkt stop --uuid-file=/var/cache/kubelet-pod.uuid
         Restart=always
         RestartSec=5
