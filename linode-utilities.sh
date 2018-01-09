@@ -28,7 +28,6 @@ linode_api() {
         args+=(-F "$arg")
     done
     curl -s -X POST "https://api.linode.com/"  -H 'cache-control: no-cache' \
-         -H 'content-type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW' \
          -F "api_key=$API_KEY" "${args[@]}"
 }
 
@@ -96,26 +95,27 @@ reset_linode() {
     local DISK_IDS
     local CONFIG_IDS
     local STATUS
+    PUBLIC_IP=$(get_public_ip $LINODE_ID)
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Getting status" "get_status $LINODE_ID" STATUS
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Getting status" "get_status $LINODE_ID" STATUS
 
     if [ "$STATUS" = "1" ]; then
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Shutting down linode" "shutdown $LINODE_ID"
+      spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Shutting down linode" "shutdown $LINODE_ID"
     fi
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving disk list" "get_disk_ids $LINODE_ID" DISK_IDS
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving disk list" "get_disk_ids $LINODE_ID" DISK_IDS
 
     for DISK_ID in $DISK_IDS; do
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting disk $DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID"
+        spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Deleting disk $DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID"
     done
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving config list" "get_config_ids $LINODE_ID" CONFIG_IDS
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving config list" "get_config_ids $LINODE_ID" CONFIG_IDS
 
     for CONFIG_ID in $CONFIG_IDS; do
-        spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting config $CONFIG_ID" "linode_api linode.config.delete LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
+        spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Deleting config $CONFIG_ID" "linode_api linode.config.delete LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
     done
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for all jobs to complete" "wait_jobs $LINODE_ID"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Waiting for all jobs to complete" "wait_jobs $LINODE_ID"
 }
 
 get_public_ip() {
@@ -163,9 +163,9 @@ create_ext4_disk() {
 }
 
 create_install_disk() {
-  linode_api linode.disk.createfromstackscript LinodeID=$LINODE_ID StackScriptID=$SCRIPT_ID \
+  linode_api linode.disk.createFromDistribution LinodeID=$LINODE_ID \
       DistributionID=140 Label=Installer Size=$INSTALL_DISK_SIZE \
-      StackScriptUDFResponses="$PARAMS" rootPass="$ROOT_PASSWORD" | jq ".DATA.DiskID"
+      rootPass="$ROOT_PASSWORD" rootSSHKey="$( cat ~/.ssh/id_rsa.pub )" | jq ".DATA.DiskID"
 }
 
 create_boot_configuration() {
@@ -187,7 +187,7 @@ update_coreos_config() {
 
 transfer_acme() {
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
-  "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < $DIR/acme.json )' \
+  "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo chmod 600 /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
@@ -210,6 +210,23 @@ change_to_unprovisioned() {
   linode_api linode.update LinodeID=$LINODE_ID Label="${NODE_TYPE}_${LINODE_ID}" lpm_displayGroup="$DOMAIN (Unprovisioned)"
 }
 
+install_coreos() {
+  LINODE_ID=$1
+  NODE_TYPE=$2
+  PUBLIC_IP=$(get_public_ip $LINODE_ID)
+
+  set +e
+  while true; do scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
+    -r install-coreos.sh root@${PUBLIC_IP}:~/install-coreos.sh && break || sleep 5; done
+  while true; do scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
+    -r manifests/container-linux/${NODE_TYPE}-config.yaml root@${PUBLIC_IP}:~/container-linux-config.yaml && break || sleep 5; done
+  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
+    "chmod +x ./install-coreos.sh" && break || sleep 5; done
+  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
+    "./install-coreos.sh" && break || sleep 5; done
+  set -e
+}
+
 install() {
     local NODE_TYPE
     local LINODE_ID
@@ -218,84 +235,59 @@ install() {
     local COREOS_OLD_DISK_SIZE
     NODE_TYPE=$1
     LINODE_ID=$2
+    PUBLIC_IP=$(get_public_ip $LINODE_ID)
     reset_linode $LINODE_ID
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Generating root password" "openssl rand -base64 32" ROOT_PASSWORD
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving current plan" "get_plan_id $LINODE_ID" PLAN
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving maximum available disk size" "get_max_disk_size $PLAN" TOTAL_DISK_SIZE
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Generating root password" "openssl rand -base64 32" ROOT_PASSWORD
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving current plan" "get_plan_id $LINODE_ID" PLAN
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving maximum available disk size" "get_max_disk_size $PLAN" TOTAL_DISK_SIZE
 
-    INSTALL_DISK_SIZE=1024
+    INSTALL_DISK_SIZE=4096
     COREOS_OLD_DISK_SIZE=$((${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}))
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
-
-    eval IP=\$PUBLIC_$LINODE_ID
-    eval PRIVATE_IP=\$PRIVATE_$LINODE_ID
-    if [ "$NODE_TYPE" = "master" ] ; then
-        PARAMS=$( cat <<-EOF
-          {
-              "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
-              "node_type": "$NODE_TYPE",
-              "PUBLIC_IP": "$IP",
-              "PRIVATE_IP": "$PRIVATE_IP"
-          }
-EOF
-        )
-    fi
-
-    if [ "$NODE_TYPE" = "worker" ] ; then
-        PARAMS=$( cat <<-EOF
-          {
-              "ssh_key": "$( cat ~/.ssh/id_rsa.pub )",
-              "node_type": "$NODE_TYPE",
-              "PUBLIC_IP": "$IP",
-              "PRIVATE_IP": "$PRIVATE_IP"
-          }
-EOF
-        )
-    fi
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
 
     # Create the install OS disk from script
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating install disk" create_install_disk INSTALL_DISK_ID
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating install disk" create_install_disk INSTALL_DISK_ID
 
     # Configure the installer to boot
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating boot configuration" create_boot_configuration CONFIG_ID
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting installer" "boot_linode $LINODE_ID $CONFIG_ID"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating CoreOS config" update_coreos_config
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Installing CoreOS (might take a while)" "wait_boot $LINODE_ID"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Shutting down CoreOS" "linode_api linode.shutdown LinodeID=$LINODE_ID"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting install disk $INSTALL_DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$INSTALL_DISK_ID"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Resizing CoreOS disk $DISK_ID" "linode_api linode.disk.resize LinodeID=$LINODE_ID DiskID=$DISK_ID Size=$TOTAL_DISK_SIZE"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating boot configuration" create_boot_configuration CONFIG_ID
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Booting installer" "boot_linode $LINODE_ID $CONFIG_ID"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Updating CoreOS config" update_coreos_config
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Installing CoreOS (might take a while)" "install_coreos $LINODE_ID $NODE_TYPE"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Shutting down CoreOS" "linode_api linode.shutdown LinodeID=$LINODE_ID"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Deleting install disk $INSTALL_DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$INSTALL_DISK_ID"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Resizing CoreOS disk $DISK_ID" "linode_api linode.disk.resize LinodeID=$LINODE_ID DiskID=$DISK_ID Size=$TOTAL_DISK_SIZE"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
     if [ "$NODE_TYPE" = "master" ] ; then
-        if [ -e $DIR/acme.json ] ; then
-            spinner "${CYAN}[$LINODE_ID]${NORMAL} Transferring acme.json" transfer_acme
+        if [ -e acme.json ] ; then
+            spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Transferring acme.json" transfer_acme
         fi
     fi
 
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Provisioning $NODE_TYPE node (might take a while)" provision_$NODE_TYPE PROVISION_LOGS
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Provisioning $NODE_TYPE node (might take a while)" "provision_$NODE_TYPE $PUBLIC_IP" PROVISION_LOGS
 
     if [ "$( echo "${PROVISION_LOGS}" | tail -n1 )" = "provisioned $NODE_TYPE" ]; then
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
+      spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Changing status to provisioned" "change_to_provisioned $LINODE_ID $NODE_TYPE"
     else
       install $NODE_TYPE $LINODE_ID
     fi
 }
 
 provision_master() {
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
-          "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
-  [ -e $DIR/cluster ] && rm -rf $DIR/cluster
-  mkdir $DIR/cluster
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/home/core/assets/* $DIR/cluster
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/bootstrap.sh"
-  mkdir -p $HOME/.kube
-  if [ -e $HOME/.kube/config ]; then
-    yes | cp $HOME/.kube/config $HOME/.kube/config.bak
-  fi
-  yes | cp $DIR/cluster/auth/kubeconfig $HOME/.kube/config
-  while true; do kubectl --namespace=kube-system create secret generic kubesecret --from-file $DIR/auth --request-timeout 0 && break || sleep 5; done
+  IP=$1
+  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+    "sudo systemctl start bootkube" && break || sleep 5; done
+  [ -e cluster ] && rm -rf cluster
+  mkdir cluster
+  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no core@${IP} "sudo chown -R core:core /opt/bootkube/assets"
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/opt/bootkube/assets/* cluster
+  mkdir -p ~/.kube
+  [ -e ~/.kube/config.bak ] && rm ~/.kube/config.bak
+  [ -e ~/.kube/config ] && mv ~/.kube/config ~/.kube/config.bak
+  cp cluster/auth/kubeconfig ~/.kube/config
+  while true; do kubectl --namespace=kube-system create secret generic kubesecret --from-file auth --request-timeout 0 && break || sleep 5; done
   if kubectl --request-timeout 0 get namespaces | grep -q "monitoring"; then
     echo "namespace monitoring exists"
   else
@@ -306,19 +298,22 @@ provision_master() {
   else
     while true; do kubectl create namespace "rook" --request-timeout 0 && break || sleep 5; done
   fi
-  while true; do kubectl --namespace=monitoring create secret generic kubesecret --from-file $DIR/auth --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl apply -f $DIR/manifests/heapster.yaml --validate=false --request-timeout 0 && break || sleep 5; done
+  while true; do kubectl --namespace=monitoring create secret generic kubesecret --from-file auth --request-timeout 0 && break || sleep 5; done
+  while true; do kubectl apply -f manifests/heapster.yaml --validate=false --request-timeout 0 && break || sleep 5; done
   if [ $INSTALL_K8S_DASHBOARD = true ]; then
-    while true; do cat $DIR/manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+    while true; do cat manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
   fi
   if [ $INSTALL_TRAEFIK = true ]; then
-    while true; do cat $DIR/manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+    while true; do cat manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
   fi
   echo "provisioned master"
 }
 
 provision_worker() {
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $DIR/cluster/auth/kubeconfig core@${IP}:/home/core/kubeconfig 2>/dev/null >/dev/null
+  IP=$1
+  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+    "echo started" && break || sleep 5; done
+  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cluster/auth/kubeconfig core@${IP}:/home/core/kubeconfig 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
   set +e
@@ -328,9 +323,9 @@ provision_worker() {
     if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
       if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
         if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
-          while true; do kubectl apply -f $DIR/manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl apply -f $DIR/manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl apply -f $DIR/manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
         fi
       fi
     fi
@@ -341,20 +336,20 @@ provision_worker() {
     if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
       if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
         if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
-          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
           printf "Waiting for Operator to register third party objects..."
           until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
           until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
           until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
-          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/node-exporter --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/grafana --request-timeout 0 && break || sleep 5; done
-          while true; do find $DIR/manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
-          while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl apply -f $DIR/manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f $DIR/manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
-          while true; do cat $DIR/manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f manifests/node-exporter --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f manifests/grafana --request-timeout 0 && break || sleep 5; done
+          while true; do find manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
+          while true; do kubectl apply -f manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl apply -f manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
+          while true; do kubectl --namespace monitoring apply -f manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
+          while true; do cat manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
         fi
       fi
     fi
@@ -362,18 +357,6 @@ provision_worker() {
 
   set -e
   echo "provisioned worker"
-}
-
-update_script() {
-  local SCRIPT_ID
-  SCRIPT_ID=$( linode_api stackscript.list | jq ".DATA" | jq -c '.[] | select(.LABEL == "CoreOS_Kube_Cluster") | .STACKSCRIPTID' | sed -n 1p )
-  if ! [[ $SCRIPT_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
-      SCRIPT_ID=$( linode_api stackscript.create DistributionIDList=140 Label=CoreOS_Kube_Cluster script="$( cat $DIR/install-coreos.sh )" \
-                  | jq ".DATA.StackScriptID" )
-  else
-      linode_api stackscript.update StackScriptID=${SCRIPT_ID} script="$( cat $DIR/install-coreos.sh )" >/dev/null
-  fi
-  echo $SCRIPT_ID
 }
 
 read_api_key() {
@@ -401,9 +384,9 @@ read_api_key() {
          tput civis
       done
   fi
-   sed -i.bak '/^API_KEY/d' $DIR/settings.env
-   echo "API_KEY=$API_KEY" >> $DIR/settings.env
-   rm $DIR/settings.env.bak
+   sed -i.bak '/^API_KEY/d' settings.env
+   echo "API_KEY=$API_KEY" >> settings.env
+   rm settings.env.bak
 }
 
 check_api_key() {
@@ -425,12 +408,12 @@ read_install_options() {
     selected_indices=(0 1 2 3)
     checkbox_input_indices "What should be included in your cluster?" options selected_indices
     eval "$(gen_env_from_options selected_indices env_names)"
-    sed -i.bak '/^INSTALL_K8S_DASHBOARD/d' $DIR/settings.env
-    sed -i.bak '/^INSTALL_TRAEFIK/d' $DIR/settings.env
-    sed -i.bak '/^INSTALL_ROOK/d' $DIR/settings.env
-    sed -i.bak '/^INSTALL_PROMETHEUS/d' $DIR/settings.env
-    echo "$(gen_env_from_options selected_indices env_names)" >> $DIR/settings.env
-    rm $DIR/settings.env.bak
+    sed -i.bak '/^INSTALL_K8S_DASHBOARD/d' settings.env
+    sed -i.bak '/^INSTALL_TRAEFIK/d' settings.env
+    sed -i.bak '/^INSTALL_ROOK/d' settings.env
+    sed -i.bak '/^INSTALL_PROMETHEUS/d' settings.env
+    echo "$(gen_env_from_options selected_indices env_names)" >> settings.env
+    rm settings.env.bak
   fi
 }
 
@@ -439,14 +422,14 @@ read_master_plan() {
       while ! [[ $MASTER_PLAN =~ ^-?[0-9]+$ ]] 2>/dev/null; do
          IFS=$'\n'
          spinner "Retrieving plans" get_plans plan_data
-         local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
-         local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
+         local plan_ids=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | .PLANID'))
+         local plan_list=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | [.RAM, .PRICE] | @csv' | \
            awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' 2>/dev/null))
          list_input_index "Select a master plan (https://www.linode.com/pricing)" plan_list selected_disk_id
 
          MASTER_PLAN=${plan_ids[$selected_disk_id]}
       done
-      echo "MASTER_PLAN=$MASTER_PLAN" >> $DIR/settings.env
+      echo "MASTER_PLAN=$MASTER_PLAN" >> settings.env
   fi
 }
 
@@ -463,7 +446,7 @@ read_worker_plan() {
 
          WORKER_PLAN=${plan_ids[$selected_disk_id]}
       done
-      echo "WORKER_PLAN=$WORKER_PLAN" >> $DIR/settings.env
+      echo "WORKER_PLAN=$WORKER_PLAN" >> settings.env
   fi
 
 }
@@ -483,7 +466,7 @@ read_datacenter() {
          list_input_index "Select a datacenter" datacenters_list selected_data_center_index
          DATACENTER_ID=${datacenters_ids[$selected_data_center_index]}
       done
-      echo "DATACENTER_ID=$DATACENTER_ID" >> $DIR/settings.env
+      echo "DATACENTER_ID=$DATACENTER_ID" >> settings.env
   fi
 }
 
@@ -493,7 +476,7 @@ read_domain() {
       while ! [[ $DOMAIN =~ $domain_regex ]] 2>/dev/null; do
          text_input "Enter Domain Name: " DOMAIN "$domain_regex" "Please enter a valid domain name"
       done
-      echo "DOMAIN=$DOMAIN" >> $DIR/settings.env
+      echo "DOMAIN=$DOMAIN" >> settings.env
   fi
   tput civis
 }
@@ -504,17 +487,17 @@ read_email() {
       while ! [[ $EMAIL =~ $email_regex ]] 2>/dev/null; do
          text_input "Enter Email: " EMAIL "^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$" "Please enter a valid email"
       done
-      echo "EMAIL=$EMAIL" >> $DIR/settings.env
+      echo "EMAIL=$EMAIL" >> settings.env
   fi
   tput civis
 }
 
 read_username() {
   if [ -z "$USERNAME" ]; then
-    [ -e $DIR/auth ] && rm $DIR/auth
-    [ -e $DIR/manifests/grafana/grafana-credentials.yaml ] && rm $DIR/manifests/grafana/grafana-credentials.yaml
+    [ -e auth ] && rm auth
+    [ -e manifests/grafana/grafana-credentials.yaml ] && rm manifests/grafana/grafana-credentials.yaml
     text_input "Enter dashboard username: " USERNAME
-    echo "USERNAME=$USERNAME" >> $DIR/settings.env
+    echo "USERNAME=$USERNAME" >> settings.env
   fi
   tput civis
 }
@@ -563,26 +546,26 @@ update_dns() {
   local IP
   local RESOURCE_IDS
   eval IP=\$PUBLIC_$LINODE_ID
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
+  spinner "${CYAN}[$IP]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
   if ! [[ $DOMAIN_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
-    spinner "${CYAN}[$LINODE_ID]${NORMAL} Creating DNS record for $DOMAIN" create_domain
+    spinner "${CYAN}[$IP]${NORMAL} Creating DNS record for $DOMAIN" create_domain
   fi
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Updating DNS record for $DOMAIN" update_domain
+  spinner "${CYAN}[$IP]${NORMAL} Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
+  spinner "${CYAN}[$IP]${NORMAL} Updating DNS record for $DOMAIN" update_domain
 
-  spinner "${CYAN}[$LINODE_ID]${NORMAL} Retrieving list of resources for $DOMAIN" "get_resources $DOMAIN_ID" RESOURCE_LIST
+  spinner "${CYAN}[$IP]${NORMAL} Retrieving list of resources for $DOMAIN" "get_resources $DOMAIN_ID" RESOURCE_LIST
 
   IFS=$'\n'
   if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .TARGET == \"$IP\") | .RESOURCEID" | sed -n 1p) =~ ^[0-9]+$ ]] 2>/dev/null; then
       RESOURCE_IDS=$(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"A\" and .NAME == \"\") | .RESOURCEID")
       for RESOURCE_ID in $RESOURCE_IDS; do
-          spinner "${CYAN}[$LINODE_ID]${NORMAL} Deleting 'A' DNS record $RESOURCE_ID" "linode_api domain.resource.delete DomainID=$DOMAIN_ID ResourceID=$RESOURCE_ID"
+          spinner "${CYAN}[$IP]${NORMAL} Deleting 'A' DNS record $RESOURCE_ID" "linode_api domain.resource.delete DomainID=$DOMAIN_ID ResourceID=$RESOURCE_ID"
       done
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding 'A' DNS record to $DOMAIN with target $IP" create_A_domain
+      spinner "${CYAN}[$IP]${NORMAL} Adding 'A' DNS record to $DOMAIN with target $IP" create_A_domain
   fi
 
   if ! [[ $(echo $RESOURCE_LIST | jq -c ".[] | select(.TYPE == \"CNAME\" and .TARGET == \"$DOMAIN\") | .RESOURCEID") =~ ^[0-9]+$ ]] 2>/dev/null; then
-      spinner "${CYAN}[$LINODE_ID]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
+      spinner "${CYAN}[$IP]${NORMAL} Adding wildcard 'CNAME' record with target $DOMAIN" create_CNAME_domain
   fi
 }
 
@@ -591,7 +574,7 @@ read_no_of_workers() {
       while ! [[ $NO_OF_WORKERS =~ ^[0-9]+$ ]] 2>/dev/null; do
          text_input "Enter number of workers: " NO_OF_WORKERS "^[0-9]+$" "Please enter a number"
       done
-      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> $DIR/settings.env
+      echo "NO_OF_WORKERS=$NO_OF_WORKERS" >> settings.env
   fi
   tput civis
 }

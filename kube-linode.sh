@@ -7,16 +7,8 @@ if [ $? -eq 0 ]; then
 fi
 set -e
 
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
-  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
-done
-DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-
-source $DIR/display.sh
-source $DIR/linode-utilities.sh
+source display.sh
+source linode-utilities.sh
 
 check_dep jq
 check_dep openssl
@@ -46,10 +38,10 @@ unset NO_OF_WORKERS
 stty -echo
 tput civis
 
-if [ -f $DIR/settings.env ] ; then
-    . $DIR/settings.env
+if [ -f settings.env ] ; then
+    . settings.env
 else
-    touch $DIR/settings.env
+    touch settings.env
 fi
 
 # -- command line argument overrides --
@@ -102,22 +94,17 @@ if [ "$1" == "teardown" ]; then
   if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]; then
     # TODO: gracefully shutdown
     for WORKER_ID in $WORKER_IDS; do
-      spinner \
-        "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" \
-        "delete_linode $WORKER_ID"
+      spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" "delete_linode $WORKER_ID"
     done
 
-    spinner \
-      "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" \
-      "delete_linode $MASTER_ID"
+    spinner "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" "delete_linode $MASTER_ID"
 
-    spinner \
-      "Deleting domain..." delete_domain
+    spinner "Deleting domain..." delete_domain
 
-    rm -rf $DIR/cluster
+    rm -rf cluster
     rm -rf $HOME/.kube
-    rm $DIR/auth
-    rm $DIR/settings.env
+    rm auth
+    rm settings.env
   fi
 
   exit 0
@@ -130,14 +117,14 @@ else
     ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa >/dev/null 2>&1
 fi
 
-if [[ -f $DIR/auth && -f $DIR/manifests/grafana/grafana-credentials.yaml ]]  ; then : ; else
+if [[ -f auth && -f manifests/grafana/grafana-credentials.yaml ]]  ; then : ; else
     read -s -p "Enter your dashboard password: " PASSWORD
     tput cub "$(tput cols)"
     tput el
-    [ -e $DIR/auth ] && rm $DIR/auth
-    htpasswd -b -c $DIR/auth $USERNAME $PASSWORD >/dev/null 2>&1
-    [ -e $DIR/manifests/grafana/grafana-credentials.yaml ] && rm $DIR/manifests/grafana/grafana-credentials.yaml
-cat > $DIR/manifests/grafana/grafana-credentials.yaml <<-EOF
+    [ -e auth ] && rm auth
+    htpasswd -b -c auth $USERNAME $PASSWORD >/dev/null 2>&1
+    [ -e manifests/grafana/grafana-credentials.yaml ] && rm manifests/grafana/grafana-credentials.yaml
+cat > manifests/grafana/grafana-credentials.yaml <<-EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -147,8 +134,6 @@ data:
   password: $( echo -n $PASSWORD | base64 $base64_args )
 EOF
 fi
-
-spinner "Updating install script" update_script SCRIPT_ID
 
 spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
 
@@ -169,10 +154,10 @@ fi
 spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting public IP" "get_public_ip $MASTER_ID" MASTER_IP
 declare "PUBLIC_$MASTER_ID=$MASTER_IP"
 
-spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting private IP" "get_private_ip $MASTER_ID" PRIVATE_IP
+spinner "${CYAN}[$MASTER_IP]${NORMAL} Getting private IP" "get_private_ip $MASTER_ID" PRIVATE_IP
 declare "PRIVATE_$MASTER_ID=$PRIVATE_IP"
 
-spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving provision status" "is_provisioned $MASTER_ID" IS_PROVISIONED
+spinner "${CYAN}[$MASTER_IP]${NORMAL} Retrieving provision status" "is_provisioned $MASTER_ID" IS_PROVISIONED
 
 if [ $IS_PROVISIONED = false ] ; then
   update_dns $MASTER_ID
@@ -180,9 +165,9 @@ if [ $IS_PROVISIONED = false ] ; then
 fi
 
 tput el
-echo "${CYAN}[$MASTER_ID]${NORMAL} Master provisioned (IP: $MASTER_IP)"
+echo "${CYAN}[$MASTER_IP]${NORMAL} Master provisioned"
 
-spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
+spinner "${CYAN}[$MASTER_IP]${NORMAL} Retrieving current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
 NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
 
 if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
@@ -193,20 +178,20 @@ if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
     done
 fi
 
-spinner "${CYAN}[$MASTER_ID]${NORMAL} Retrieving list of workers" list_worker_ids WORKER_IDS
+spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
 
 for WORKER_ID in $WORKER_IDS; do
    spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting public IP" "get_public_ip $WORKER_ID" PUBLIC_IP
    declare "PUBLIC_$WORKER_ID=$PUBLIC_IP"
 
-   spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting private IP" "get_private_ip $WORKER_ID" PRIVATE_IP
+   spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Getting private IP" "get_private_ip $WORKER_ID" PRIVATE_IP
    declare "PRIVATE_$WORKER_ID=$PRIVATE_IP"
 
    if [ "$( is_provisioned $WORKER_ID )" = false ] ; then
      install worker $WORKER_ID
    fi
    tput el
-   echo "${CYAN}[$WORKER_ID]${NORMAL} Worker provisioned (IP: $PUBLIC_IP)"
+   echo "${CYAN}[$PUBLIC_IP]${NORMAL} Worker provisioned"
 done
 
 wait

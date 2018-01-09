@@ -2,10 +2,16 @@ passwd:
   users:
     - name: core
       ssh_authorized_keys:
-        - "$SSH_KEY"
+        - "#SSH_KEY#"
 storage:
   files:
-    - path: "/etc/traefik/acme/acme.json"
+    - path: /etc/hostname
+      filesystem: root
+      mode: 0420
+      contents:
+        inline: |
+          #HOSTNAME#
+    - path: /etc/traefik/acme/acme.json
       filesystem: root
       contents:
         inline: |
@@ -14,15 +20,15 @@ storage:
       filesystem: root
       contents:
         inline: |
-          COREOS_PUBLIC_IPV4=$COREOS_PUBLIC_IPV4
-          COREOS_PRIVATE_IPV4=$COREOS_PRIVATE_IPV4
+          COREOS_PUBLIC_IPV4=#COREOS_PUBLIC_IPV4#
+          COREOS_PRIVATE_IPV4=#COREOS_PRIVATE_IPV4#
     - path: /etc/kubernetes/kubelet.env
       filesystem: root
       mode: 0644
       contents:
         inline: |
           KUBELET_IMAGE_URL=docker://gcr.io/google_containers/hyperkube
-          KUBELET_IMAGE_TAG=v1.8.5
+          KUBELET_IMAGE_TAG=v1.9.1
     - path: /etc/sysctl.d/max-user-watches.conf
       filesystem: root
       contents:
@@ -52,37 +58,6 @@ storage:
           # ======== START OF RESOURCE RENDERING ===========
           sudo mkdir -p /opt/bootkube /etc/kubernetes
           [ -e /opt/bootkube/assets ] && sudo rm -rf /opt/bootkube/assets
-          [ -e /etc/systemd/system/etcd-member.service.d/10-etcd-member.conf ] && sudo rm /etc/systemd/system/etcd-member.service.d/10-etcd-member.conf
-
-          function configure_etcd() {
-              [ -f "/etc/systemd/system/etcd-member.service.d/10-etcd-member.conf" ] || {
-                  sudo mkdir -p /etc/etcd/tls
-                  sudo cp ${BOOTKUBE_ASSETS}/tls/etcd-* /etc/etcd/tls
-                  sudo mkdir -p /etc/etcd/tls/etcd
-                  sudo cp ${BOOTKUBE_ASSETS}/tls/etcd/* /etc/etcd/tls/etcd
-                  sudo chown -R etcd:etcd /etc/etcd
-                  sudo chmod -R u=rX,g=,o= /etc/etcd
-                  sudo mkdir -p /etc/systemd/system/etcd-member.service.d
-                  sudo cat << EOF > /etc/systemd/system/etcd-member.service.d/10-etcd-member.conf
-          [Service]
-          Environment="ETCD_IMAGE_TAG=v3.2.0"
-          Environment="ETCD_NAME=controller"
-          Environment="ETCD_INITIAL_CLUSTER=controller=https://${COREOS_PRIVATE_IPV4}:2380"
-          Environment="ETCD_INITIAL_ADVERTISE_PEER_URLS=https://${COREOS_PRIVATE_IPV4}:2380"
-          Environment="ETCD_ADVERTISE_CLIENT_URLS=https://${COREOS_PRIVATE_IPV4}:2379"
-          Environment="ETCD_LISTEN_CLIENT_URLS=https://0.0.0.0:2379"
-          Environment="ETCD_LISTEN_PEER_URLS=https://0.0.0.0:2380"
-          Environment="ETCD_SSL_DIR=/etc/etcd/tls"
-          Environment="ETCD_TRUSTED_CA_FILE=/etc/ssl/certs/etcd/server-ca.crt"
-          Environment="ETCD_CERT_FILE=/etc/ssl/certs/etcd/server.crt"
-          Environment="ETCD_KEY_FILE=/etc/ssl/certs/etcd/server.key"
-          Environment="ETCD_CLIENT_CERT_AUTH=true"
-          Environment="ETCD_PEER_TRUSTED_CA_FILE=/etc/ssl/certs/etcd/peer-ca.crt"
-          Environment="ETCD_PEER_CERT_FILE=/etc/ssl/certs/etcd/peer.crt"
-          Environment="ETCD_PEER_KEY_FILE=/etc/ssl/certs/etcd/peer.key"
-          EOF
-              }
-          }
 
           sudo /usr/bin/rkt run \
             --trust-keys-from-https \
@@ -95,18 +70,22 @@ storage:
             --net=host \
             --dns=host \
             --exec=/bootkube -- render --asset-dir=/opt/bootkube/assets \
-            --etcd-servers=https://${COREOS_PRIVATE_IPV4}:2379 \
+            --etcd-servers=https://#COREOS_PRIVATE_IPV4#:2379 \
             --network-provider=flannel \
-            --api-servers=https://${COREOS_PUBLIC_IPV4}:6443,https://${COREOS_PRIVATE_IPV4}:6443
+            --api-servers=https://#COREOS_PUBLIC_IPV4#:6443,https://#COREOS_PRIVATE_IPV4#:6443
 
           sudo mkdir -p /etc/kubernetes
           sudo cp ${BOOTKUBE_ASSETS}/auth/kubeconfig /etc/kubernetes/
           sudo cp ${BOOTKUBE_ASSETS}/tls/ca.crt /etc/kubernetes/ca.crt
 
-          configure_etcd
-          sudo systemctl enable etcd-member; sudo systemctl start etcd-member
-          sudo systemctl enable kubelet; sudo systemctl start kubelet
+          sudo mkdir -p /etc/etcd/tls
+          sudo cp ${BOOTKUBE_ASSETS}/tls/etcd-* /etc/etcd/tls
+          sudo mkdir -p /etc/etcd/tls/etcd
+          sudo cp ${BOOTKUBE_ASSETS}/tls/etcd/* /etc/etcd/tls/etcd
+          sudo chown -R etcd:etcd /etc/etcd
+          sudo chmod -R u=rX,g=,o= /etc/etcd
 
+          sudo systemctl enable kubelet; sudo systemctl start kubelet
           # ======= END OF RESOURCE RENDERING ========
 
           exec /usr/bin/rkt run \
@@ -129,14 +108,35 @@ networkd:
 
         [Network]
         DHCP=no
-        DNS=${DNS}
+        DNS=#DNS#
         Domains=members.linode.com
         IPv6PrivacyExtensions=false
-        Gateway=${GATEWAY}
-        Address=${COREOS_PUBLIC_IPV4}/24
-        Address=${COREOS_PRIVATE_IPV4}/17
+        Gateway=#GATEWAY#
+        Address=#COREOS_PUBLIC_IPV4#/24
+        Address=#COREOS_PRIVATE_IPV4#/17
 systemd:
   units:
+    - name: etcd-member.service
+      enable: true
+      dropins:
+        - name: 40-etcd-cluster.conf
+          contents: |
+            [Service]
+            Environment="ETCD_IMAGE_TAG=v3.2.13"
+            Environment="ETCD_NAME=controller"
+            Environment="ETCD_INITIAL_CLUSTER=controller=https://#COREOS_PRIVATE_IPV4#:2380"
+            Environment="ETCD_INITIAL_ADVERTISE_PEER_URLS=https://#COREOS_PRIVATE_IPV4#:2380"
+            Environment="ETCD_ADVERTISE_CLIENT_URLS=https://#COREOS_PRIVATE_IPV4#:2379"
+            Environment="ETCD_LISTEN_CLIENT_URLS=https://0.0.0.0:2379"
+            Environment="ETCD_LISTEN_PEER_URLS=https://0.0.0.0:2380"
+            Environment="ETCD_SSL_DIR=/etc/etcd/tls"
+            Environment="ETCD_TRUSTED_CA_FILE=/etc/ssl/certs/etcd/server-ca.crt"
+            Environment="ETCD_CERT_FILE=/etc/ssl/certs/etcd/server.crt"
+            Environment="ETCD_KEY_FILE=/etc/ssl/certs/etcd/server.key"
+            Environment="ETCD_CLIENT_CERT_AUTH=true"
+            Environment="ETCD_PEER_TRUSTED_CA_FILE=/etc/ssl/certs/etcd/peer-ca.crt"
+            Environment="ETCD_PEER_CERT_FILE=/etc/ssl/certs/etcd/peer.crt"
+            Environment="ETCD_PEER_KEY_FILE=/etc/ssl/certs/etcd/peer.key"
     - name: docker.service
       enable: true
     - name: locksmithd.service
@@ -212,7 +212,7 @@ systemd:
           --cluster_domain=cluster.local \
           --cni-conf-dir=/etc/kubernetes/cni/net.d \
           --exit-on-lock-contention \
-          --hostname-override=${COREOS_PUBLIC_IPV4} \
+          --hostname-override=#COREOS_PUBLIC_IPV4# \
           --kubeconfig=/etc/kubernetes/kubeconfig \
           --lock-file=/var/run/lock/kubelet.lock \
           --network-plugin=cni \
@@ -225,4 +225,3 @@ systemd:
         RestartSec=10
         [Install]
         WantedBy=multi-user.target
-#~/go/src/github.com/coreos/container-linux-config-transpiler/bin/ct --in-file manifests/container-linux-config.yaml | sed 's/%24%7BPRIVATE_IP%7D/${PRIVATE_IP}/g' | sed 's/%24%7BPUBLIC_IP%7D/${PUBLIC_IP}/g' | sed 's/\\\\\\n//g' | jq '.' | sed 's/\${COREOS_PUBLIC_IPV4}/\\${COREOS_PUBLIC_IPV4}/g' | sed 's/\$PATH/\\$PATH/g' | sed 's/\\\\n/\\n/g' | pbcopy
