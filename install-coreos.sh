@@ -16,5 +16,6 @@ cat container-linux-config.yaml \
   | sed "s/#HOSTNAME#/$(echo $PUBLIC_IP | sed "s/\./-/g")/g" \
   | sed "s/#GATEWAY#/${PUBLIC_IP%.*}.1/g" \
   | sed "s/#DNS#/$(cat /etc/resolv.conf | awk '/^nameserver /{ print $0 }' | sed 's/nameserver //g' | tr '\n' ' ')/g" \
+  | sed "s/#REBOOT_STRATEGY#/${REBOOT_STRATEGY}/g" \
   | ./ct > container-linux-config.json
 ./coreos-install -d /dev/sda -i container-linux-config.json
