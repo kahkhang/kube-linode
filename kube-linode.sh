@@ -34,6 +34,7 @@ unset MASTER_ID
 unset API_KEY
 unset USERNAME
 unset NO_OF_WORKERS
+unset REBOOT_STRATEGY
 
 stty -echo
 tput civis
@@ -63,6 +64,7 @@ for argument in $options
       --install_traefik=*)         INSTALL_TRAEFIK=${argument/*=/""} ;;
       --install_rook=*)            INSTALL_ROOK=${argument/*=/""} ;;
       --install_prometheus=*)      INSTALL_PROMETHEUS=${argument/*=/""} ;;
+      --reboot_strategy=*)         REBOOT_STRATEGY=${argument/*=/""} ;;
     esac
   done
 
@@ -75,6 +77,8 @@ read_email
 read_no_of_workers
 read_username
 read_install_options
+read_reboot_strategy
+
 
 if [ "$1" == "teardown" ]; then
   spinner "Retrieving master linode (if any)" get_master_id MASTER_ID

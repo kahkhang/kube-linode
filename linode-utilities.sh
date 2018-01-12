@@ -223,7 +223,7 @@ install_coreos() {
   while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
     "chmod +x ./install-coreos.sh" && break || sleep 5; done
   while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
-    "./install-coreos.sh" && break || sleep 5; done
+    "REBOOT_STRATEGY=${REBOOT_STRATEGY} ./install-coreos.sh" && break || sleep 5; done
   set -e
 }
 
@@ -500,6 +500,15 @@ read_username() {
     echo "USERNAME=$USERNAME" >> settings.env
   fi
   tput civis
+}
+
+read_reboot_strategy() {
+  if [ -z "$REBOOT_STRATEGY" ]; then
+    strategies=("off" "etcd-lock" "reboot")
+    list_input_index "Select a update strategy (see https://coreos.com/os/docs/latest/update-strategies.html)" strategies strategy
+    REBOOT_STRATEGY=${strategies[$strategy]}
+    echo "REBOOT_STRATEGY=$REBOOT_STRATEGY" >> settings.env
+  fi
 }
 
 get_domains() {

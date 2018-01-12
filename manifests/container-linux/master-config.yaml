@@ -139,8 +139,6 @@ systemd:
             Environment="ETCD_PEER_KEY_FILE=/etc/ssl/certs/etcd/peer.key"
     - name: docker.service
       enable: true
-    - name: locksmithd.service
-      mask: true
     - name: kubelet.path
       enable: true
       contents: |
@@ -225,3 +223,5 @@ systemd:
         RestartSec=10
         [Install]
         WantedBy=multi-user.target
+locksmith:
+  reboot_strategy: #REBOOT_STRATEGY#
