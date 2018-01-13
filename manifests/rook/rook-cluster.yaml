@@ -55,10 +55,10 @@ spec:
 #      podAffinity:
 #      podAntiAffinity:
 #      tolerations:
-  storage:                # cluster level storage configuration and selection
+  storage:
     useAllNodes: true
     useAllDevices: false
-    deviceFilter:
+    deviceFilter: sdb
     metadataDevice:
     location:
     storeConfig:
