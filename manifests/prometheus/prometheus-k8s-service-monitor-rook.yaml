@@ -15,4 +15,5 @@ spec:
   endpoints:
   - port: rook-api
     path: /metrics
-    interval: 5s
+    interval: 60s
+    scrapeTimeout: 30s
