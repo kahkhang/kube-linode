@@ -57,7 +57,7 @@ spec:
 #      tolerations:
   storage:
     useAllNodes: true
-    useAllDevices: true
+    useAllDevices: false
     deviceFilter: sdb
     metadataDevice:
     location:
