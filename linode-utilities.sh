@@ -186,16 +186,12 @@ update_coreos_config() {
 }
 
 transfer_acme() {
+  IP=$1
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
   ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo chmod 600 /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
-}
-
-delete_bootstrap_script() {
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
-          "rm bootstrap.sh" 2>/dev/null
 }
 
 change_to_provisioned() {
@@ -264,7 +260,7 @@ install() {
 
     if [ "$NODE_TYPE" = "master" ] ; then
         if [ -e acme.json ] ; then
-            spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Transferring acme.json" transfer_acme
+            spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Transferring acme.json" "transfer_acme $PUBLIC_IP"
         fi
     fi
 
@@ -290,23 +286,24 @@ provision_master() {
   [ -e ~/.kube/config ] && mv ~/.kube/config ~/.kube/config.bak
   cp cluster/auth/kubeconfig ~/.kube/config
   while true; do kubectl --namespace=kube-system create secret generic kubesecret --from-file auth --request-timeout 0 && break || sleep 5; done
-  if kubectl --request-timeout 0 get namespaces | grep -q "monitoring"; then
-    echo "namespace monitoring exists"
-  else
-    while true; do kubectl create namespace "monitoring" --request-timeout 0 && break || sleep 5; done
-  fi
-  if kubectl --request-timeout 0 get namespaces | grep -q "rook"; then
-    echo "namespace rook exists"
-  else
-    while true; do kubectl create namespace "rook" --request-timeout 0 && break || sleep 5; done
-  fi
+  cat <<EOF | kubectl apply --request-timeout 0 -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook
+EOF
   while true; do kubectl --namespace=monitoring create secret generic kubesecret --from-file auth --request-timeout 0 && break || sleep 5; done
-  while true; do kubectl apply -f manifests/heapster.yaml --validate=false --request-timeout 0 && break || sleep 5; done
+  while true; do kubectl apply -f manifests/heapster.yaml --request-timeout 0 && break || sleep 5; done
   if [ $INSTALL_K8S_DASHBOARD = true ]; then
     while true; do cat manifests/kube-dashboard.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
   fi
   if [ $INSTALL_TRAEFIK = true ]; then
-    while true; do cat manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\${MASTER_IP}/${IP}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
+    while true; do cat manifests/traefik.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | sed "s/\$EMAIL/${EMAIL}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
   fi
   echo "provisioned master"
 }

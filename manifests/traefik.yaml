@@ -92,7 +92,7 @@ data:
       [entryPoints.https.tls]
     [acme]
     email = "$EMAIL"
-    storageFile = "/acme/acme.json"
+    storage = "/acme/acme.json"
     entryPoint = "https"
     onDemand = true
     onHostRule = true
@@ -126,7 +126,7 @@ spec:
             name: traefik-conf
         - name: acme
           hostPath:
-            path: /etc/traefik/acme/acme.json
+            path: /etc/traefik/acme
       containers:
         - image: traefik
           name: traefik-ingress-lb
@@ -134,7 +134,7 @@ spec:
           volumeMounts:
             - mountPath: "/config"
               name: "config"
-            - mountPath: "/acme/acme.json"
+            - mountPath: "/acme"
               name: "acme"
           ports:
             - containerPort: 80
