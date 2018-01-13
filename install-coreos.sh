@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+[[ -n "$REBOOT_STRATEGY" ]] || die "Need a reboot strategy. Run with eg. '\$REBOOT_STRATEGY=off ./install-coreos.sh'"
+
 PUBLIC_IP=$(ip addr show eth0 | grep "inet\b" | grep "/24" | awk '{print $2}' | cut -d/ -f1)
 PRIVATE_IP=$(ip addr show eth0 | grep "inet\b" | grep "/17" | awk '{print $2}' | cut -d/ -f1)
 

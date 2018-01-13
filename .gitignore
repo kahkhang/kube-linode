@@ -11,3 +11,4 @@ resolv.conf
 bootkube
 manifests/grafana/grafana-credentials.yaml
 install.exp
+manifests/container-linux/master-config.yaml.bak

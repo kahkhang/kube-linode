@@ -182,7 +182,7 @@ boot_linode() {
 
 update_coreos_config() {
   linode_api linode.config.update LinodeID=$LINODE_ID ConfigID=$CONFIG_ID Label="CoreOS" \
-      DiskList=$DISK_ID KernelID=213 RootDeviceNum=1 helper_network=false
+      DiskList=$DISK_ID,$STORAGE_DISK_ID KernelID=213 RootDeviceNum=1 helper_network=false
 }
 
 transfer_acme() {
@@ -232,7 +232,6 @@ install() {
     local LINODE_ID
     local PLAN
     local ROOT_PASSWORD
-    local COREOS_OLD_DISK_SIZE
     NODE_TYPE=$1
     LINODE_ID=$2
     PUBLIC_IP=$(get_public_ip $LINODE_ID)
@@ -241,22 +240,25 @@ install() {
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving current plan" "get_plan_id $LINODE_ID" PLAN
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving maximum available disk size" "get_max_disk_size $PLAN" TOTAL_DISK_SIZE
 
-    INSTALL_DISK_SIZE=4096
-    COREOS_OLD_DISK_SIZE=$((${TOTAL_DISK_SIZE}-${INSTALL_DISK_SIZE}))
+    INSTALL_DISK_SIZE=1024
+    COREOS_DISK_SIZE=10240
+    STORAGE_DISK_SIZE=$((${TOTAL_DISK_SIZE}-${COREOS_DISK_SIZE}))
 
-    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_OLD_DISK_SIZE CoreOS" DISK_ID
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating ${COREOS_DISK_SIZE}mb CoreOS disk" "create_raw_disk $LINODE_ID $COREOS_DISK_SIZE CoreOS" DISK_ID
 
     # Create the install OS disk from script
-    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating install disk" create_install_disk INSTALL_DISK_ID
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating ${INSTALL_DISK_SIZE}mb install disk" create_install_disk INSTALL_DISK_ID
 
     # Configure the installer to boot
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating boot configuration" create_boot_configuration CONFIG_ID
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Booting installer" "boot_linode $LINODE_ID $CONFIG_ID"
-    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Updating CoreOS config" update_coreos_config
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Installing CoreOS (might take a while)" "install_coreos $LINODE_ID $NODE_TYPE"
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Shutting down CoreOS" "linode_api linode.shutdown LinodeID=$LINODE_ID"
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Deleting install disk $INSTALL_DISK_ID" "linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$INSTALL_DISK_ID"
-    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Resizing CoreOS disk $DISK_ID" "linode_api linode.disk.resize LinodeID=$LINODE_ID DiskID=$DISK_ID Size=$TOTAL_DISK_SIZE"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Waiting for existing jobs to complete" "wait_jobs $LINODE_ID"
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Creating ${STORAGE_DISK_SIZE}mb storage disk" "create_raw_disk $LINODE_ID $STORAGE_DISK_SIZE Storage" STORAGE_DISK_ID
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Updating CoreOS config" update_coreos_config
+    spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Waiting for existing jobs to complete" "wait_jobs $LINODE_ID"
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Booting CoreOS" "linode_api linode.boot LinodeID=$LINODE_ID ConfigID=$CONFIG_ID"
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Waiting for CoreOS to be ready" "wait_jobs $LINODE_ID; sleep 20"
 
@@ -321,37 +323,29 @@ provision_worker() {
 
   if [ $INSTALL_ROOK = true ]; then
     if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
-      if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
-        if ! kubectl --namespace rook get pods --request-timeout 0 2>/dev/null | grep -q "^rook-api"; then
-          while true; do kubectl apply -f manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl apply -f manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl apply -f manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
-        fi
-      fi
+      while true; do kubectl apply -f manifests/rook/rook-operator.yaml --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl apply -f manifests/rook/rook-cluster.yaml --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl apply -f manifests/rook/rook-storageclass.yaml --request-timeout 0 && break || sleep 5; done
     fi
   fi
 
   if [ $INSTALL_PROMETHEUS = true ]; then
     until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
     if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
-      if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
-        if ! kubectl --namespace monitoring get ingress --request-timeout 0 2>/dev/null | grep -q "^prometheus-ingress"; then
-          while true; do kubectl --namespace monitoring apply -f manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
-          printf "Waiting for Operator to register third party objects..."
-          until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
-          until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
-          until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
-          while true; do kubectl --namespace monitoring apply -f manifests/node-exporter --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f manifests/grafana --request-timeout 0 && break || sleep 5; done
-          while true; do find manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
-          while true; do kubectl apply -f manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl apply -f manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
-          while true; do kubectl --namespace monitoring apply -f manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
-          while true; do cat manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
-        fi
-      fi
+      while true; do kubectl --namespace monitoring apply -f manifests/prometheus-operator --request-timeout 0 && break || sleep 5; done
+      printf "Waiting for Operator to register third party objects..."
+      until kubectl --namespace monitoring get servicemonitor > /dev/null 2>&1; do sleep 1; printf "."; done
+      until kubectl --namespace monitoring get prometheus > /dev/null 2>&1; do sleep 1; printf "."; done
+      until kubectl --namespace monitoring get alertmanager > /dev/null 2>&1; do sleep 1; printf "."; done
+      while true; do kubectl --namespace monitoring apply -f manifests/node-exporter --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl --namespace monitoring apply -f manifests/kube-state-metrics --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl --namespace monitoring apply -f manifests/grafana/grafana-credentials.yaml --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl --namespace monitoring apply -f manifests/grafana --request-timeout 0 && break || sleep 5; done
+      while true; do find manifests/prometheus -type f ! -name prometheus-k8s-roles.yaml ! -name prometheus-k8s-role-bindings.yaml ! -name prometheus-k8s-ingress.yaml -exec kubectl --request-timeout 0 --namespace "monitoring" apply -f {} \; && break || sleep 5; done
+      while true; do kubectl apply -f manifests/prometheus/prometheus-k8s-roles.yaml --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl apply -f manifests/prometheus/prometheus-k8s-role-bindings.yaml --request-timeout 0 && break || sleep 5; done
+      while true; do kubectl --namespace monitoring apply -f manifests/alertmanager/ --request-timeout 0 && break || sleep 5; done
+      while true; do cat manifests/prometheus/prometheus-k8s-ingress.yaml | sed "s/\${DOMAIN}/${DOMAIN}/g" | kubectl apply --request-timeout 0 --validate=false -f - && break || sleep 5; done
     fi
   fi
 

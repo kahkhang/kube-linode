@@ -57,8 +57,6 @@ spec:
       name: http
     - port: 443
       name: https
-  externalIPs:
-    - ${MASTER_IP}
 ---
 apiVersion: v1
 kind: Service
@@ -107,14 +105,13 @@ data:
         Buckets=[0.1,0.3,1.2,5.0]
 ---
 apiVersion: extensions/v1beta1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: traefik-ingress-controller
   namespace: kube-system
   labels:
     k8s-app: traefik-ingress-lb
 spec:
-  replicas: 1
   revisionHistoryLimit: 0
   template:
     metadata:
@@ -152,6 +149,15 @@ spec:
             - --web.metrics.prometheus.buckets=0.1,0.3,1.2,5.0
             - --kubernetes
             - --logLevel=DEBUG
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: In
+                values:
+                -
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
