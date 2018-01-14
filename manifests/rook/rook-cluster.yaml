@@ -58,7 +58,7 @@ spec:
   storage:
     useAllNodes: true
     useAllDevices: false
-    deviceFilter: sdb
+    deviceFilter: ^sd[^a]
     metadataDevice:
     location:
     storeConfig:
