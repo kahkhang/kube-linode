@@ -97,6 +97,8 @@ data:
     onDemand = true
     onHostRule = true
     caServer = "https://acme-v01.api.letsencrypt.org/directory"
+    [acme.httpChallenge]
+      entryPoint = "http"
     [[acme.domains]]
       main = "${DOMAIN}"
     [web]
