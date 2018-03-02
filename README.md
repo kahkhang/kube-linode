@@ -10,7 +10,7 @@ Automatically provision a scalable CoreOS/Kubernetes cluster on Linode with zero
 The cluster will comprise of a single Kubernetes master host with a custom number of worker nodes.
 
 ### What's included
-* [Kubernetes 1.9.1](https://kubernetes.io/) with [Bootkube](https://github.com/kubernetes-incubator/bootkube)
+* [Kubernetes 1.9.3](https://kubernetes.io/) with [Bootkube](https://github.com/kubernetes-incubator/bootkube)
 * Load Balancer and automatic SSL/TLS renewal using [Traefik](https://github.com/containous/traefik)
 * Distributed block storage with [Rook](https://github.com/rook/rook)
 * Pre-configured [Grafana](https://github.com/grafana/grafana) dashboard using [Kube-Prometheus](https://github.com/coreos/prometheus-operator/tree/master/contrib/kube-prometheus) with Rook and Traefik monitoring
@@ -25,29 +25,21 @@ The cluster will comprise of a single Kubernetes master host with a custom numbe
 git clone https://github.com/kahkhang/kube-linode
 cd kube-linode
 chmod +x kube-linode.sh
-```
-
-Just run `./kube-linode.sh` into your console, key in your configuration, then sit back and have a :coffee:!
-
-Settings are stored in `settings.env`, or you can pass them in as key-value flags as such:
-
+```  
+Just run `./kube-linode.sh create` into your console, key in your configuration, then sit back and have a :coffee:!  
+Settings are stored in `settings.env`, or you can pass them in as key-value flags as such:  
 ```sh
 ./kube-linode.sh --no_of_workers=3 --api_key=12345
-```
-
-To increase the number of workers, modify `NO_OF_WORKERS` in `settings.env` as desired and run `./kube-linode.sh` again.
-
-Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)
-
+```  
+To increase the number of workers, modify `NO_OF_WORKERS` in `settings.env` as desired and run `./kube-linode.sh` again.  
+Use `kubectl` to control the cluster (e.g. `kubectl get nodes`)  
 <hr>
 
-Later, should you want to start over from scratch, or if you just want to stop everything, you can run
-
+If you want to destroy the cluster created by kube-linode, you can run the following command:
 ```sh
-./kube-linode.sh teardown
-```
-
-And all your linodes - everything - will be deleted.
+./kube-linode.sh destroy
+```  
+A prompt will be given listing all the nodes which will be destroyed upon confirmation  .
 
 ### Dependencies
 You should have a Linode account, which you can get [here](https://www.linode.com/?r=0affaec6ca42ca06f5f2c2d3d8d1ceb354e222c1).

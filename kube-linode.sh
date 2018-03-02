@@ -79,41 +79,6 @@ read_username
 read_install_options
 read_reboot_strategy
 
-
-if [ "$1" == "teardown" ]; then
-  spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
-
-  if [ -z "$MASTER_ID" ]; then
-    exit "No Master node found!"
-  fi
-
-  spinner "Retrieving worker linodes (if any)" list_worker_ids WORKER_IDS
-
-  if [ -z "$WORKER_IDS" ]; then
-    exit "No Worker node found!"
-  fi
-
-  text_input "Are you sure you want to delete the local cluster? [y/N]" response
-
-  if [[ "$response" =~ ^([yY][eE][sS]|[yY])+$ ]]; then
-    # TODO: gracefully shutdown
-    for WORKER_ID in $WORKER_IDS; do
-      spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" "delete_linode $WORKER_ID"
-    done
-
-    spinner "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" "delete_linode $MASTER_ID"
-
-    spinner "Deleting domain..." delete_domain
-
-    rm -rf cluster
-    rm -rf $HOME/.kube
-    rm auth
-    rm settings.env
-  fi
-
-  exit 0
-fi
-
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""
 else
@@ -122,7 +87,7 @@ else
 fi
 
 if [[ -f auth && -f manifests/grafana/grafana-credentials.yaml ]]  ; then : ; else
-    read -s -p "Enter your dashboard password: " PASSWORD
+    read -s -p "${green}?${normal}${bold} Enter your dashboard password: ${normal}" PASSWORD
     tput cub "$(tput cols)"
     tput el
     [ -e auth ] && rm auth
@@ -139,64 +104,116 @@ data:
 EOF
 fi
 
-spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
-
-if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
-   spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
-   for WORKER_ID in $WORKER_IDS; do
-      spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker (since certs are now invalid)"\
-                  "linode_api linode.delete LinodeID=$WORKER_ID skipChecks=true"
-   done
-
-   spinner "Creating master linode" "create_linode $DATACENTER_ID $MASTER_PLAN" MASTER_ID
-   spinner "Adding private IP" "add_private_ip $MASTER_ID"
-
-   spinner "${CYAN}[$MASTER_ID]${NORMAL} Initializing labels" \
-           "linode_api linode.update LinodeID=$MASTER_ID Label=\"master_${MASTER_ID}\" lpm_displayGroup=\"$DOMAIN (Unprovisioned)\""
-fi
-
-spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting public IP" "get_public_ip $MASTER_ID" MASTER_IP
-declare "PUBLIC_$MASTER_ID=$MASTER_IP"
-
-spinner "${CYAN}[$MASTER_IP]${NORMAL} Getting private IP" "get_private_ip $MASTER_ID" PRIVATE_IP
-declare "PRIVATE_$MASTER_ID=$PRIVATE_IP"
-
-spinner "${CYAN}[$MASTER_IP]${NORMAL} Retrieving provision status" "is_provisioned $MASTER_ID" IS_PROVISIONED
-
-if [ $IS_PROVISIONED = false ] ; then
-  update_dns $MASTER_ID
-  install master $MASTER_ID
-fi
-
-tput el
-echo "${CYAN}[$MASTER_IP]${NORMAL} Master provisioned"
-
-spinner "${CYAN}[$MASTER_IP]${NORMAL} Retrieving current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
-NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
-
-if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
-    for WORKER in $( seq $NO_OF_NEW_WORKERS ); do
-        spinner "Creating worker linode" "create_linode $DATACENTER_ID $WORKER_PLAN" WORKER_ID
-        spinner "Adding private IP" "add_private_ip $WORKER_ID"
-        spinner "Initializing labels" "change_to_unprovisioned $WORKER_ID worker"
+if [ "$1" == "destroy" ]; then
+  spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
+  if [ -z "$MASTER_ID" ]; then
+    tput el
+    echo "${red}No master node found! Cluster is likely to have been deleted.${normal}"
+  else
+    spinner "Retrieving worker linodes (if any)" list_worker_ids WORKER_IDS
+    tput el
+    echo "${bold}${red}The following nodes will be deleted:${normal}"
+    echo "  ${cyan}${arrow}${normal} master_$MASTER_ID [https://manager.linode.com/linodes/dashboard/master_$MASTER_ID]"
+    for WORKER_ID in $WORKER_IDS; do
+      echo "  ${cyan}${arrow}${normal} worker_$WORKER_ID [https://manager.linode.com/linodes/dashboard/worker_$WORKER_ID]"
     done
+    text_input "Are you sure you want to delete the cluster? [y/n] " \
+      response "^[yn]$" "Please enter either 'y' or 'n'"
+    tput civis
+
+    if [[ "$response" =~ ^y$ ]]; then
+      for WORKER_ID in $WORKER_IDS; do
+        spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" "delete_linode $WORKER_ID"
+      done
+      spinner "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" "delete_linode $MASTER_ID"
+    fi
+  fi
+  spinner "Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
+  if [[ $DOMAIN_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
+    text_input "Do you want to delete the DNS record for $DOMAIN? [y/n] " \
+      response "^[yn]$" "Please enter either 'y' or 'n'"
+    tput civis
+    if [[ "$response" =~ ^y$ ]]; then
+      spinner "Deleting DNS record for $DOMAIN" delete_domain
+    fi
+  fi
+
+  text_input "Do you want to delete the current cluster configuration (including ~/.kube/config)? [y/n] " \
+    response "^[yn]$" "Please enter either 'y' or 'n'"
+  tput civis
+  if [[ "$response" =~ ^y$ ]]; then
+    [ -e manifests/grafana/grafana-credentials.yaml ] && rm manifests/grafana/grafana-credentials.yaml
+    [ -e cluster ] && rm -rf cluster
+    [ -e ~/.kube/config ] && rm ~/.kube/config
+    [ -e auth ] && rm auth
+    [ -e settings.env ] && rm settings.env
+    touch settings.env
+    echo "API_KEY=$API_KEY" >> settings.env
+  fi
+elif [ "$1" == "create" ]; then
+  spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
+
+  if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
+     spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
+     for WORKER_ID in $WORKER_IDS; do
+        spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker (since certs are now invalid)"\
+                    "linode_api linode.delete LinodeID=$WORKER_ID skipChecks=true"
+     done
+
+     spinner "Creating master linode" "create_linode $DATACENTER_ID $MASTER_PLAN" MASTER_ID
+     spinner "Adding private IP" "add_private_ip $MASTER_ID"
+
+     spinner "${CYAN}[$MASTER_ID]${NORMAL} Initializing labels" \
+             "linode_api linode.update LinodeID=$MASTER_ID Label=\"master_${MASTER_ID}\" lpm_displayGroup=\"$DOMAIN (Unprovisioned)\""
+  fi
+
+  spinner "${CYAN}[$MASTER_ID]${NORMAL} Getting public IP" "get_public_ip $MASTER_ID" MASTER_IP
+  declare "PUBLIC_$MASTER_ID=$MASTER_IP"
+
+  spinner "${CYAN}[$MASTER_IP]${NORMAL} Getting private IP" "get_private_ip $MASTER_ID" PRIVATE_IP
+  declare "PRIVATE_$MASTER_ID=$PRIVATE_IP"
+
+  spinner "${CYAN}[$MASTER_IP]${NORMAL} Retrieving provision status" "is_provisioned $MASTER_ID" IS_PROVISIONED
+
+  if [ $IS_PROVISIONED = false ] ; then
+    update_dns $MASTER_ID
+    install master $MASTER_ID
+  fi
+
+  tput el
+  echo "${CYAN}[$MASTER_IP]${NORMAL} Master provisioned"
+
+  spinner "${CYAN}[$MASTER_IP]${NORMAL} Retrieving current number of workers" get_no_of_workers CURRENT_NO_OF_WORKERS
+  NO_OF_NEW_WORKERS=$( echo "$NO_OF_WORKERS - $CURRENT_NO_OF_WORKERS" | bc )
+
+  if [[ $NO_OF_NEW_WORKERS -gt 0 ]]; then
+      for WORKER in $( seq $NO_OF_NEW_WORKERS ); do
+          spinner "Creating worker linode" "create_linode $DATACENTER_ID $WORKER_PLAN" WORKER_ID
+          spinner "Adding private IP" "add_private_ip $WORKER_ID"
+          spinner "Initializing labels" "change_to_unprovisioned $WORKER_ID worker"
+      done
+  fi
+
+  spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
+
+  for WORKER_ID in $WORKER_IDS; do
+     spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting public IP" "get_public_ip $WORKER_ID" PUBLIC_IP
+     declare "PUBLIC_$WORKER_ID=$PUBLIC_IP"
+
+     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Getting private IP" "get_private_ip $WORKER_ID" PRIVATE_IP
+     declare "PRIVATE_$WORKER_ID=$PRIVATE_IP"
+
+     if [ "$( is_provisioned $WORKER_ID )" = false ] ; then
+       install worker $WORKER_ID
+     fi
+     tput el
+     echo "${CYAN}[$PUBLIC_IP]${NORMAL} Worker provisioned"
+  done
+else
+  echo "${bold}${red}Not a valid action!${normal}"
+  echo "Type ${green}./kube-linode.sh create${normal} to create a cluster"
+  echo "Type ${green}./kube-linode.sh destroy${normal} to destroy created cluster"
 fi
-
-spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
-
-for WORKER_ID in $WORKER_IDS; do
-   spinner "${CYAN}[$WORKER_ID]${NORMAL} Getting public IP" "get_public_ip $WORKER_ID" PUBLIC_IP
-   declare "PUBLIC_$WORKER_ID=$PUBLIC_IP"
-
-   spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Getting private IP" "get_private_ip $WORKER_ID" PRIVATE_IP
-   declare "PRIVATE_$WORKER_ID=$PRIVATE_IP"
-
-   if [ "$( is_provisioned $WORKER_ID )" = false ] ; then
-     install worker $WORKER_ID
-   fi
-   tput el
-   echo "${CYAN}[$PUBLIC_IP]${NORMAL} Worker provisioned"
-done
 
 wait
 
