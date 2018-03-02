@@ -430,8 +430,8 @@ read_worker_plan() {
          IFS=$'\n'
          spinner "Retrieving plans" get_plans plan_data
          tput el
-         local plan_ids=($(echo $plan_data | jq -r '.[] | .PLANID'))
-         local plan_list=($(echo $plan_data | jq -r '.[] | [.RAM, .PRICE] | @csv' | \
+         local plan_ids=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | .PLANID'))
+         local plan_list=($(echo $plan_data | jq -r '.[] | select(.RAM >= 2048) | [.RAM, .PRICE] | @csv' | \
            awk -v FS="," '{ram=$1/1024; printf "%3sGB (\$%s/mo)%s",ram,$2,ORS}' 2>/dev/null))
          list_input_index "Select a worker plan (https://www.linode.com/pricing)" plan_list selected_disk_id
 
@@ -587,12 +587,6 @@ create_linode() {
 
 delete_linode() {
   local LINODE_ID="$1"
-  local DISK_IDS=$(get_disk_ids $LINODE_ID)
-
-  for DISK_ID in "$DISK_IDS" ; do
-    linode_api linode.disk.delete LinodeID=$LINODE_ID DiskID=$DISK_ID >/dev/null
-  done
-
   linode_api linode.delete LinodeID=$LINODE_ID skipChecks=true >/dev/null
 }
 
