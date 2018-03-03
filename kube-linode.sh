@@ -130,9 +130,9 @@ if [ "$1" == "destroy" ]; then
 
     if [[ "$response" =~ ^y$ ]]; then
       for WORKER_ID in $WORKER_IDS; do
-        spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker" "delete_linode $WORKER_ID"
+        spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker node" "delete_linode $WORKER_ID"
       done
-      spinner "${CYAN}[$MASTER_ID]${NORMAL} Deleting master" "delete_linode $MASTER_ID"
+      spinner "${CYAN}[$MASTER_ID]${NORMAL} Deleting master node" "delete_linode $MASTER_ID"
     fi
   fi
   spinner "Retrieving DNS record for $DOMAIN" "get_domains \"$DOMAIN\"" DOMAIN_ID
