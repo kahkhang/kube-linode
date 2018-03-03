@@ -25,6 +25,13 @@ check_dep sed
 check_dep cat
 check_dep tr
 
+if [[ "$1" != "create" && "$1" != "destroy" ]]; then
+  echo "${bold}${red}Not a valid action!${normal}"
+  echo "Type ${green}./kube-linode.sh create${normal} to create a cluster"
+  echo "Type ${green}./kube-linode.sh destroy${normal} to destroy created cluster"
+  exit 1
+fi
+
 unset DATACENTER_ID
 unset MASTER_PLAN
 unset WORKER_PLAN
@@ -209,10 +216,6 @@ elif [ "$1" == "create" ]; then
      tput el
      echo "${CYAN}[$PUBLIC_IP]${NORMAL} Worker provisioned"
   done
-else
-  echo "${bold}${red}Not a valid action!${normal}"
-  echo "Type ${green}./kube-linode.sh create${normal} to create a cluster"
-  echo "Type ${green}./kube-linode.sh destroy${normal} to destroy created cluster"
 fi
 
 wait

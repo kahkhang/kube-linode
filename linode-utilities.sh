@@ -170,7 +170,7 @@ create_install_disk() {
 
 create_boot_configuration() {
   linode_api linode.config.create LinodeID=$LINODE_ID KernelID=138 Label="Installer" \
-      DiskList=$DISK_ID,$INSTALL_DISK_ID RootDeviceNum=2 | jq ".DATA.ConfigID"
+      DiskList=$DISK_ID,$INSTALL_DISK_ID RootDeviceNum=2 helper_network=true | jq ".DATA.ConfigID"
 }
 
 boot_linode() {
