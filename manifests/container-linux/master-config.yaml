@@ -52,7 +52,7 @@ storage:
             rm -rf /opt/bootkube/assets/manifests-*
 
           BOOTKUBE_ACI="${BOOTKUBE_ACI:-quay.io/coreos/bootkube}"
-          BOOTKUBE_VERSION="${BOOTKUBE_VERSION:-v0.9.3}"
+          BOOTKUBE_VERSION="${BOOTKUBE_VERSION:-v0.11.0}"
           BOOTKUBE_ASSETS="${BOOTKUBE_ASSETS:-/opt/bootkube/assets}"
 
           # ======== START OF RESOURCE RENDERING ===========
