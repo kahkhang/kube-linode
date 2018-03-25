@@ -42,6 +42,7 @@ unset API_KEY
 unset USERNAME
 unset NO_OF_WORKERS
 unset REBOOT_STRATEGY
+unset WORKER_IDS
 
 stty -echo
 tput civis
@@ -113,7 +114,7 @@ fi
 
 if [ "$1" == "destroy" ]; then
   spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
-  if [ -z "$MASTER_ID" ]; then
+  if ! [[ $MASTER_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
     tput el
     echo "${red}No master node found! Cluster is likely to have been deleted.${normal}"
   else
@@ -160,7 +161,7 @@ if [ "$1" == "destroy" ]; then
 elif [ "$1" == "create" ]; then
   spinner "Retrieving master linode (if any)" get_master_id MASTER_ID
 
-  if ! [[ $MASTER_ID =~ ^-?[0-9]+$ ]] 2>/dev/null; then
+  if ! [[ $MASTER_ID =~ ^[0-9]+$ ]] 2>/dev/null; then
      spinner "Retrieving list of workers" list_worker_ids WORKER_IDS
      for WORKER_ID in $WORKER_IDS; do
         spinner "${CYAN}[$WORKER_ID]${NORMAL} Deleting worker (since certs are now invalid)"\
