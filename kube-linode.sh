@@ -43,6 +43,7 @@ unset USERNAME
 unset NO_OF_WORKERS
 unset REBOOT_STRATEGY
 unset WORKER_IDS
+unset SSH_KEY
 
 stty -echo
 tput civis
@@ -73,6 +74,7 @@ for argument in $options
       --install_rook=*)            INSTALL_ROOK=${argument/*=/""} ;;
       --install_prometheus=*)      INSTALL_PROMETHEUS=${argument/*=/""} ;;
       --reboot_strategy=*)         REBOOT_STRATEGY=${argument/*=/""} ;;
+      --ssh_key=*)                 SSH_KEY=${argument/*=/""} ;;
     esac
   done
 
@@ -86,6 +88,7 @@ read_no_of_workers
 read_username
 read_install_options
 read_reboot_strategy
+read_ssh_key
 
 if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
     spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""

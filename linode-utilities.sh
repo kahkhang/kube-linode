@@ -502,6 +502,15 @@ read_reboot_strategy() {
   fi
 }
 
+read_ssh_key() {
+  if [ -z "$SSH_KEY" ]; then
+    SSH_KEY="~/.ssh/id_rsa"
+    echo "No SSH key specified with --ssh_key command line argument, using " $SSH_KEY
+  fi
+  echo "SSH_KEY=$SSH_KEY" >> settings.env
+  tput civis
+}
+
 get_domains() {
   local DOMAIN=$1
   linode_api domain.list | jq ".DATA" | jq -c ".[] | select(.DOMAIN == \"$DOMAIN\") | .DOMAINID"
