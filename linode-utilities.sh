@@ -165,7 +165,7 @@ create_ext4_disk() {
 create_install_disk() {
   linode_api linode.disk.createFromDistribution LinodeID=$LINODE_ID \
       DistributionID=140 Label=Installer Size=$INSTALL_DISK_SIZE \
-      rootPass="$ROOT_PASSWORD" rootSSHKey="$( cat ~/.ssh/id_rsa.pub )" | jq ".DATA.DiskID"
+      rootPass="$ROOT_PASSWORD" rootSSHKey="$( cat $SSH_KEY.pub )" | jq ".DATA.DiskID"
 }
 
 create_boot_configuration() {
@@ -187,10 +187,10 @@ update_coreos_config() {
 
 transfer_acme() {
   IP=$1
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+  ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo truncate -s 0 /etc/traefik/acme/acme.json; echo '$( base64 $base64_args < acme.json )' \
    | base64 --decode | sudo tee --append /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+  ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
   "sudo chmod 600 /etc/traefik/acme/acme.json" 2>/dev/null >/dev/null
 }
 
@@ -212,13 +212,13 @@ install_coreos() {
   PUBLIC_IP=$(get_public_ip $LINODE_ID)
 
   set +e
-  while true; do scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
+  while true; do scp -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
     -r install-coreos.sh root@${PUBLIC_IP}:~/install-coreos.sh && break || sleep 5; done
-  while true; do scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
+  while true; do scp -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \
     -r manifests/container-linux/${NODE_TYPE}-config.yaml root@${PUBLIC_IP}:~/container-linux-config.yaml && break || sleep 5; done
-  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
+  while true; do ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
     "chmod +x ./install-coreos.sh" && break || sleep 5; done
-  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
+  while true; do ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@${PUBLIC_IP} \
     "REBOOT_STRATEGY=${REBOOT_STRATEGY} ./install-coreos.sh" && break || sleep 5; done
   set -e
 }
@@ -275,12 +275,12 @@ install() {
 
 provision_master() {
   IP=$1
-  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+  while true; do ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
     "sudo systemctl start bootkube" && break || sleep 5; done
   [ -e cluster ] && rm -rf cluster
   mkdir cluster
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no core@${IP} "sudo chown -R core:core /opt/bootkube/assets"
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/opt/bootkube/assets/* cluster
+  ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no core@${IP} "sudo chown -R core:core /opt/bootkube/assets"
+  scp -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r core@${IP}:/opt/bootkube/assets/* cluster
   mkdir -p ~/.kube
   [ -e ~/.kube/config.bak ] && rm ~/.kube/config.bak
   [ -e ~/.kube/config ] && mv ~/.kube/config ~/.kube/config.bak
@@ -310,11 +310,11 @@ EOF
 
 provision_worker() {
   IP=$1
-  while true; do ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
+  while true; do ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" \
     "echo started" && break || sleep 5; done
-  scp -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cluster/auth/kubeconfig core@${IP}:/home/core/kubeconfig 2>/dev/null >/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
-  ssh -i ~/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
+  scp -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cluster/auth/kubeconfig core@${IP}:/home/core/kubeconfig 2>/dev/null >/dev/null
+  ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "sudo ./bootstrap.sh" 2>/dev/null >/dev/null
+  ssh -i $SSH_KEY -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt "core@$IP" "rm -rf /home/core/kubeconfig && rm -rf /home/core/bootstrap.sh" 2>/dev/null >/dev/null
   set +e
   until kubectl get nodes > /dev/null 2>&1; do sleep 1; done
 
