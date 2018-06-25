@@ -43,6 +43,7 @@ unset USERNAME
 unset NO_OF_WORKERS
 unset REBOOT_STRATEGY
 unset WORKER_IDS
+unset SSH_KEY
 
 stty -echo
 tput civis
@@ -73,6 +74,7 @@ for argument in $options
       --install_rook=*)            INSTALL_ROOK=${argument/*=/""} ;;
       --install_prometheus=*)      INSTALL_PROMETHEUS=${argument/*=/""} ;;
       --reboot_strategy=*)         REBOOT_STRATEGY=${argument/*=/""} ;;
+      --ssh_key=*)                 SSH_KEY=${argument/*=/""} ;;
     esac
   done
 
@@ -86,12 +88,13 @@ read_no_of_workers
 read_username
 read_install_options
 read_reboot_strategy
+read_ssh_key
 
-if [[ ! ( -f ~/.ssh/id_rsa && -f ~/.ssh/id_rsa.pub ) ]]; then
-    spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N \"\""
+if [[ ! ( -f $SSH_KEY && -f $SSH_KEY.pub ) ]]; then
+    spinner "Generating new SSH key" "ssh-keygen -b 2048 -t rsa -f $SSH_KEY -q -N \"\""
 else
     eval `ssh-agent -s` >/dev/null 2>&1
-    ssh-add -l | grep -q "$(ssh-keygen -lf ~/.ssh/id_rsa  | awk '{print $2}')" || ssh-add ~/.ssh/id_rsa >/dev/null 2>&1
+    ssh-add -l | grep -q "$(ssh-keygen -lf $SSH_KEY  | awk '{print $2}')" || ssh-add $SSH_KEY >/dev/null 2>&1
 fi
 
 if [[ -f auth && -f manifests/grafana/grafana-credentials.yaml ]]  ; then : ; else
