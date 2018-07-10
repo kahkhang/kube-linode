@@ -236,7 +236,7 @@ install() {
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving current plan" "get_plan_id $LINODE_ID" PLAN
     spinner "${CYAN}[$PUBLIC_IP]${NORMAL} Retrieving maximum available disk size" "get_max_disk_size $PLAN" TOTAL_DISK_SIZE
 
-    INSTALL_DISK_SIZE=1024
+    INSTALL_DISK_SIZE=2000
     COREOS_DISK_SIZE=10240
     STORAGE_DISK_SIZE=$((${TOTAL_DISK_SIZE}-${COREOS_DISK_SIZE}))
 
