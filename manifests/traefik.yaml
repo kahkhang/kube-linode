@@ -130,7 +130,7 @@ spec:
           hostPath:
             path: /etc/traefik/acme
       containers:
-        - image: traefik:v1.5.3
+        - image: traefik:v1.6.5
           name: traefik-ingress-lb
           imagePullPolicy: Always
           volumeMounts:
